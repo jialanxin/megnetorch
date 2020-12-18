@@ -38,6 +38,8 @@ class CrystalGraph:
         bond_length = np.array(self.encode_bond_length_with_Gaussian_distance(),dtype=np.float32)
         bond_atom_1 = np.array(self.bond_atom_1,dtype=np.int)
         bond_atom_2 = np.array(self.bond_atom_2,dtype=np.int)
-        input = {"atoms":atom,"state":state,"bond_length":bond_length,"bond_atom_1":bond_atom_1,"bond_atom_2":bond_atom_2}
+        num_of_atoms = atom.shape[0]
+        num_of_bonds = bond_length.shape[0]
+        input = {"atoms":atom,"state":state,"bond_length":bond_length,"bond_atom_1":bond_atom_1,"bond_atom_2":bond_atom_2,"natoms":num_of_atoms,"nbonds":num_of_bonds}
         return input
 
