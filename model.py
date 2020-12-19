@@ -108,10 +108,14 @@ class MegNet(torch.nn.Module):
             bonds,atoms,state = block(bonds,bond_atom_1,bond_atom_2,atoms,state)
         batch_size = atoms.shape[0]
         num_bonds = bonds.shape[1]
-        batch = torch.LongTensor([i for i in range(batch_size)]).unsqueeze(dim=1).repeat((1,num_bonds)).to("cuda")   # device specific
-        bonds = self.set2set_e(bonds,batch=batch)  
-        atoms = self.set2set_v(atoms,batch=batch)  
+        num_atoms = atoms.shape[1]
+        bonds = torch.flatten(bonds,end_dim=1)
+        atoms = torch.flatten(atoms,end_dim=1)
+        batch_bond = torch.LongTensor([i for i in range(batch_size)]).unsqueeze(dim=1).repeat((1,num_bonds)).flatten(end_dim=1).to("cuda")  # device specific 
+        batch_atoms = torch.LongTensor([i for i in range(batch_size)]).unsqueeze(dim=1).repeat((1,num_atoms)).flatten(end_dim=1).to("cuda")  # device specific
+        bonds = self.set2set_e(bonds,batch=batch_bond).unsqueeze(dim=1)
+        atoms = self.set2set_v(atoms,batch=batch_atoms).unsqueeze(dim=1)  
         gather_all = torch.cat((bonds,atoms,state),dim=2)
         gather_all = self.hidden_layer(gather_all)
-        output_spectrum = torch.squeeze(self.output_layer(gather_all))
+        output_spectrum = self.output_layer(gather_all)
         return output_spectrum

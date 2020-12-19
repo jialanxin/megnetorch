@@ -55,3 +55,8 @@ set2set=Set2Set(in_channels=2,processing_steps=1)
 
 output = set2set(new_input,new_batch)
 print("end")
+
+input = torch.rand((7,330,32))
+input = torch.flatten(input,end_dim=1)
+batch = torch.LongTensor([i for i in range(7)]).unsqueeze(dim=1).repeat((1,330)).flatten(end_dim=1)
+print(batch.shape)
