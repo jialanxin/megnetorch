@@ -22,24 +22,24 @@ class CrystalGraph:
         return center_indices[exclude_self], neighbor_indices[exclude_self], distances[exclude_self]
     def __init__(self,structure:Structure):
         super().__init__()
-        self.atomic_numbers = self.get_atomic_numbers(structure)
+        self.atomic_numbers = np.array(self.get_atomic_numbers(structure),dtype=np.int)
         self.bond_atom_1,self.bond_atom_2,self.bond_length = self.get_neighbors_within_cutoff(structure)
         if np.size(np.unique(self.bond_atom_1)) < len(self.atomic_numbers):
             raise RuntimeError("Isolated atoms found in the structure")
-        self.state = [[0.0,0.0]]
+        self.state = np.array([0.0,0.0],dtype=np.float)
     def encode_bond_length_with_Gaussian_distance(self,min_length:float=0.0,max_length:float=5.0,intervals:int=100,expand_width:float=0.5)->np.ndarray:
         bond_length = self.bond_length
         centers = np.linspace(min_length,max_length,intervals)
         result = np.exp(-(bond_length[:,None]-centers[None,:])**2/expand_width**2)
         return result
     def convert_to_model_input(self)->Dict:
-        atom = np.array(self.atomic_numbers,dtype=np.int)
-        state = np.array(self.state,dtype=np.float32)
-        bond_length = np.array(self.encode_bond_length_with_Gaussian_distance(),dtype=np.float32)
-        bond_atom_1 = np.array(self.bond_atom_1,dtype=np.int)
-        bond_atom_2 = np.array(self.bond_atom_2,dtype=np.int)
-        num_of_atoms = atom.shape[0]
-        num_of_bonds = bond_length.shape[0]
-        input = {"atoms":atom,"state":state,"bond_length":bond_length,"bond_atom_1":bond_atom_1,"bond_atom_2":bond_atom_2,"natoms":num_of_atoms,"nbonds":num_of_bonds}
+        atoms = torch.LongTensor(self.atomic_numbers)
+        state = torch.FloatTensor(self.state)
+        bonds = torch.FloatTensor(self.encode_bond_length_with_Gaussian_distance())
+        bond_atom_1 = torch.LongTensor(self.bond_atom_1)
+        bond_atom_2 = torch.LongTensor(self.bond_atom_2)
+        num_atoms = atoms.shape[0]
+        num_bonds = bonds.shape[0]
+        input = {"atoms":atoms,"state":state,"bonds":bonds,"bond_atom_1":bond_atom_1,"bond_atom_2":bond_atom_2,"num_atoms":num_atoms,"num_bonds":num_bonds}
         return input
 

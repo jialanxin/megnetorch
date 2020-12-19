@@ -1,5 +1,6 @@
 from utils.graph import CrystalGraph
 from torch.utils.data import Dataset
+import torch
 
 
 class StructureRamanDataset(Dataset):
@@ -8,20 +9,14 @@ class StructureRamanDataset(Dataset):
         length = len(structures)
         if length != len(ramans):
             raise RuntimeError("Length of Structures and Ramans do not match!")
-        dataset = {}
+        couples = []
         for i in range(length):
             structure = structures[i]
-            raman = ramans[i]
+            raman = torch.FloatTensor(ramans[i])
             graph = CrystalGraph(structure)
             input = graph.convert_to_model_input()
-            natoms = input["natoms"]
-            nbonds = input["nbonds"]
-            key = f"{natoms}_{nbonds}"
-            if key in dataset:
-                dataset[key].append((input,raman))
-            else:
-                dataset[key] = [(input,raman)]
-        return dataset
+            couples.append((input,raman))
+        return couples
     def __init__(self,structures,ramans) -> None:
         super().__init__()
         self.data_info = self.get_input(structures,ramans)

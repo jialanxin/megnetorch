@@ -4,10 +4,11 @@ from torch.nn import Embedding
 from torch_geometric.nn import Set2Set
 
 def ff(input_dim):
-    return torch.nn.Sequential(torch.nn.Linear(input_dim,64),torch.nn.Softplus(),torch.nn.Linear(64,32),torch.nn.Softplus())
+    return torch.nn.Sequential(torch.nn.Linear(input_dim,64),torch.nn.SELU(),torch.nn.Linear(64,32),torch.nn.SELU())
 def fff(input_dim):
-    return torch.nn.Sequential(torch.nn.Linear(input_dim,64),torch.nn.Softplus(),torch.nn.Linear(64,64),torch.nn.Softplus(),torch.nn.Linear(64,32),torch.nn.Softplus())
-
+    return torch.nn.Sequential(torch.nn.Linear(input_dim,64),torch.nn.SELU(),torch.nn.Linear(64,64),torch.nn.SELU(),torch.nn.Linear(64,32),torch.nn.SELU())
+def ff_output(input_dim,output_dim):
+    return torch.nn.Sequential(torch.nn.Linear(input_dim,128),torch.nn.SELU(),torch.nn.Linear(128,64),torch.nn.SELU(),torch.nn.Linear(64,output_dim),torch.nn.SELU())
 
 class MegNetLayer(torch.nn.Module):
     def __init__(self) -> None:
@@ -15,39 +16,37 @@ class MegNetLayer(torch.nn.Module):
         self.phi_e = fff(128)
         self.phi_v = fff(96)
         self.phi_u = fff(96)
+        
     def forward(self,bonds,bond_atom_1,bond_atom_2,atoms,state):
-        # batch_size = bonds.shape[0]
-        num_bonds = bonds.shape[1]
-        dim2 = bonds.shape[2]
-        # for ix_bond in range(num_bonds):
-        #     for ix_batch in range(batch_size):
-        #         for res in dim2:
-        #            atom_1_to_bonds[ix_batch,ix_bond,res] =atoms[ix_batch,bond_atom_1[ix_batch,ix_bond,res],res]
-        bond_atom_1 = bond_atom_1.unsqueeze(dim=2).repeat((1,1,dim2))
-        bond_atom_2 = bond_atom_2.unsqueeze(dim=2).repeat((1,1,dim2))
-        atom_1_to_bonds = torch.gather(input=atoms,dim=1,index=bond_atom_1)
-        atom_2_to_bonds = torch.gather(input=atoms,dim=1,index=bond_atom_2)
-        bonds = torch.cat((atom_1_to_bonds,atom_2_to_bonds,bonds,state.repeat((1,num_bonds,1))),dim=2)
-        bonds = self.phi_e(bonds)
+        sum_of_num_bonds = bonds.shape[0]
+        atom_info = atoms.shape[1]
+        # for ix_bond in range(sum_of_num_bonds):
+        #     for res in range(atom_info):
+        #        atom_1_to_bonds[ix_bond,res] =atoms[bond_atom_1[ix_bond,res],res]
+        bond_atom_1 = bond_atom_1.unsqueeze(dim=1).repeat((1,atom_info))  # (sum_of_num_bonds,atom_info)
+        bond_atom_2 = bond_atom_2.unsqueeze(dim=1).repeat((1,atom_info))  # (sum_of_num_bonds,atom_info)
+        atom_1_to_bonds = torch.gather(input=atoms,dim=0,index=bond_atom_1)  #(sum_of_num_bonds,atom_info)
+        atom_2_to_bonds = torch.gather(input=atoms,dim=0,index=bond_atom_2)  #(sum_of_num_bonds,atom_info)
+        bonds = torch.cat((atom_1_to_bonds,atom_2_to_bonds,bonds,state.repeat((sum_of_num_bonds,1))),dim=1) #(sum_of_num_bonds,atom_info*2+bond_info+state_info)
+        bonds = self.phi_e(bonds) #(sum_of_num_bonds,bond_info)
 
-        bonds_to_atoms = torch.zeros_like(atoms)
-        num_atoms = atoms.shape[1]
-        count_bonds_to_atoms = torch.zeros_like(atoms)
-        # for ix_bond in range(num_bonds):
-        #     for ix_batch in range(batch_size):
-        #         for res in dim2:
-        #             bonds_to_atoms[ix_batch,bond_atom_1[ix_batch,ix_bond,res],res] += bonds[ix_batch,ix_bond,res]
-        #             count_bonds_to_atoms[ix_batch,bond_atom_1[ix_batch,ix_bond,res],res]+=1
-        bonds_to_atoms = bonds_to_atoms.scatter_add(dim=1,index=bond_atom_1,src=bonds)
-        count_bonds_to_atoms = count_bonds_to_atoms.scatter_add(dim=1,index=bond_atom_1,src=torch.ones_like(bonds))
-        bonds_to_atoms = bonds_to_atoms/count_bonds_to_atoms
-        atoms = torch.cat((bonds_to_atoms,atoms,state.repeat((1,num_atoms,1))),dim=2)
-        atoms = self.phi_v(atoms)
+        bonds_to_atoms = torch.zeros_like(atoms) #(sum_of_num_atoms,bond_info) here because bond_info and atom_info are both 32
+        sum_of_num_atoms = atoms.shape[0]
+        count_bonds_to_atoms = torch.zeros_like(atoms) #(sum_of_num_atoms,bond_info)
+        # for ix_bond in range(sum_of_num_bonds):
+        #     for res in range(bond_info):
+        #         bonds_to_atoms[bond_atom_1[ix_bond,res],res] += bonds[ix_bond,res]
+        #         count_bonds_to_atoms[bond_atom_1[ix_bond,res],res]+=1
+        bonds_to_atoms = bonds_to_atoms.scatter_add(dim=0,index=bond_atom_1,src=bonds)  
+        count_bonds_to_atoms = count_bonds_to_atoms.scatter_add(dim=0,index=bond_atom_1,src=torch.ones_like(bonds))
+        bonds_to_atoms = bonds_to_atoms/count_bonds_to_atoms #(sum_of_num_atoms,bond_info)
+        atoms = torch.cat((bonds_to_atoms,atoms,state.repeat((sum_of_num_atoms,1))),dim=1) #(sum_of_num_atoms,bond_info+atom_info+state_info)
+        atoms = self.phi_v(atoms) #(sum_of_num_atoms,atom_info)
 
-        bonds_to_state = torch.mean(bonds,dim=1,keepdim=True)
-        atoms_to_state = torch.mean(atoms,dim=1,keepdim=True)
-        state = torch.cat((bonds_to_state,atoms_to_state,state),dim=2)
-        state = self.phi_u(state)
+        bonds_to_state = torch.mean(bonds,dim=0,keepdim=True) # (1,bond_info)
+        atoms_to_state = torch.mean(atoms,dim=0,keepdim=True) # (1,atom_info)
+        state = torch.cat((bonds_to_state,atoms_to_state,state),dim=1)  #(1,bond_info+atom_info+state_info)
+        state = self.phi_u(state)  #(1,state_info)
         return bonds, atoms, state
 
 class FirstMegnetBlock(torch.nn.Module):
@@ -95,27 +94,19 @@ class MegNet(torch.nn.Module):
         self.fullblocks = torch.nn.ModuleList([FullMegnetBlock() for i in range(3)])
         self.set2set_e = Set2Set(in_channels=32,processing_steps=3)
         self.set2set_v = Set2Set(in_channels=32,processing_steps=3)
-        self.hidden_layer = torch.nn.Linear(160,128)
-        self.output_layer = torch.nn.Linear(128,200)
+        self.output_layer = ff_output(input_dim=160,output_dim=200)
 
-    def forward(self, atoms,state,bonds,bond_atom_1,bond_atom_2):
-        atoms_embedded = self.atomic_embedding(atoms)
-        atoms = self.atom_preblock(atoms_embedded)
-        bonds = self.bond_preblock(bonds)
-        state = self.state_preblock(state)
+    def forward(self, atoms,state,bonds,bond_atom_1,bond_atom_2,batch_mark_for_atoms,batch_mark_for_bonds):
+        atoms_embedded = self.atomic_embedding(atoms) #(sum_of_num_atoms,atom_info)
+        atoms = self.atom_preblock(atoms_embedded)    #(sum_of_num_atoms,atom_info)
+        bonds = self.bond_preblock(bonds)             #(sum_of_num_bonds,bond_info)
+        state = self.state_preblock(state)            #(1,state_info)
         bonds,atoms,state = self.firstblock(bonds,bond_atom_1,bond_atom_2,atoms,state)
         for block in self.fullblocks:
             bonds,atoms,state = block(bonds,bond_atom_1,bond_atom_2,atoms,state)
-        batch_size = atoms.shape[0]
-        num_bonds = bonds.shape[1]
-        num_atoms = atoms.shape[1]
-        bonds = torch.flatten(bonds,end_dim=1)
-        atoms = torch.flatten(atoms,end_dim=1)
-        batch_bond = torch.LongTensor([i for i in range(batch_size)]).unsqueeze(dim=1).repeat((1,num_bonds)).flatten(end_dim=1).to("cuda")  # device specific 
-        batch_atoms = torch.LongTensor([i for i in range(batch_size)]).unsqueeze(dim=1).repeat((1,num_atoms)).flatten(end_dim=1).to("cuda")  # device specific
-        bonds = self.set2set_e(bonds,batch=batch_bond).unsqueeze(dim=1)
-        atoms = self.set2set_v(atoms,batch=batch_atoms).unsqueeze(dim=1)  
-        gather_all = torch.cat((bonds,atoms,state),dim=2)
-        gather_all = self.hidden_layer(gather_all)
-        output_spectrum = self.output_layer(gather_all)
+        batch_size = batch_mark_for_bonds.max()+1
+        bonds = self.set2set_e(bonds,batch=batch_mark_for_bonds)  # (batch_size,bond_info)
+        atoms = self.set2set_v(atoms,batch=batch_mark_for_atoms)  # (batch_size,atom_info)
+        gather_all = torch.cat((bonds,atoms,state.repeat(batch_size,1)),dim=1) #(batch_size, bond_info+atom_info+state_info)
+        output_spectrum = self.output_layer(gather_all) #(batch_size, raman_info)
         return output_spectrum
