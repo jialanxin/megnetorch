@@ -5,6 +5,7 @@ import json
 from model import MegNet
 import torch
 import time
+from dataloader import collate_fn
 
 with open("Structures.pkl","rb") as f:
     structures = pickle.load(f)
@@ -12,32 +13,6 @@ with open("Structures.pkl","rb") as f:
 with open("Raman_encoded_JVASP_90000.json","r") as f:
     ramans = json.loads(f.read())
 
-def collate_fn(structure_list):
-    num_of_structures = len(structure_list)
-    for i in range(num_of_structures):
-        inputs,ramans = structure_list[i]
-        atoms, state, bonds,bond_atom_1,bond_atom_2,num_atoms,num_bonds = inputs["atoms"],inputs["state"],inputs["bonds"],inputs["bond_atom_1"],inputs["bond_atom_2"],inputs["num_atoms"],inputs["num_bonds"]
-        if i == 0 :
-            atoms_of_batch = atoms #(num_atoms,)
-            state_of_batch = state.unsqueeze(dim=0) #(1,2)
-            bonds_of_batch = bonds #(num_bonds,bond_info)
-            bond_atom_1_of_batch = bond_atom_1 #(num_bonds,)
-            bond_atom_2_of_batch = bond_atom_2 #(num_bonds,)
-            batch_mark_for_atoms = torch.LongTensor([i for count in range(num_atoms)]) #(num_of_atoms,)
-            batch_mark_for_bonds = torch.LongTensor([i for count in range(num_bonds)]) #(num_of_bonds,)
-            ramans_of_batch = ramans.unsqueeze(dim=0) #(1,raman_size)
-        else:
-            atoms_of_batch = torch.cat((atoms_of_batch,atoms),dim=0)  #(sum_of_num_atoms,)
-            bonds_of_batch = torch.cat((bonds_of_batch,bonds),dim=0)  #(sum_of_num_bonds,bond_info)
-            bond_atom_1 = bond_atom_1+batch_mark_for_atoms.shape[0]
-            bond_atom_1_of_batch = torch.cat((bond_atom_1_of_batch,bond_atom_1),dim=0) #(sum_of_num_bonds,)
-            bond_atom_2 = bond_atom_2+batch_mark_for_atoms.shape[0]
-            bond_atom_2_of_batch = torch.cat((bond_atom_2_of_batch,bond_atom_2),dim=0) #(sum_of_num_bonds,)
-            batch_mark_for_atoms = torch.cat((batch_mark_for_atoms,torch.LongTensor([i for count in range(num_atoms)]))) #(sum_of_num_atoms,)
-            batch_mark_for_bonds = torch.cat((batch_mark_for_bonds,torch.LongTensor([i for count in range(num_bonds)]))) #(sum_of_num_bonds,)
-            ramans_of_batch = torch.cat((ramans_of_batch,ramans.unsqueeze(dim=0)),dim=0) #(batch_size,raman_info)
-
-    return (atoms_of_batch,state_of_batch,bonds_of_batch,bond_atom_1_of_batch,bond_atom_2_of_batch,batch_mark_for_atoms,batch_mark_for_bonds,ramans_of_batch)
 
 
 device = torch.device("cuda")
@@ -47,8 +22,16 @@ net = MegNet()
 net.to(device)
 
 loss_func = torch.nn.MSELoss()
-optimizer = torch.optim.Adam(net.parameters())
-for epoch in range(60):
+optimizer = torch.optim.Adam(net.parameters(),lr=1e-4)
+checkpoint = torch.load("./checkpoint_epoch_1501_loss_0.014194694575336245.pkl")
+net.load_state_dict(checkpoint["model_state_dict"])
+optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+start_epoch = checkpoint["epoch"]
+
+from torch.utils.tensorboard import SummaryWriter
+writer = SummaryWriter()
+
+for epoch in range(start_epoch+1,2002):
     start = torch.cuda.Event(enable_timing=True)
     end   = torch.cuda.Event(enable_timing=True)
     start.record()
@@ -67,6 +50,8 @@ for epoch in range(60):
     print(f"epoch:{epoch}")
     print(f"Time:{start.elapsed_time(end)}")
     print(f"Loss:{accumulate_loss}")
-    # if epoch % 5 == 1:
-    #     checkpoint = {"model_state_dict":net.state_dict(),"optimizer_state_dict":optimizer.state_dict(),"epoch":epoch,"loss":accumulate_loss}
-    #     torch.save(checkpoint,f"./checkpoint_epoch_{epoch}_loss_{accumulate_loss}.pkl")
+    writer.add_scalar("Loss vs Epoch",accumulate_loss,epoch)
+    if epoch % 100 == 1:
+        checkpoint = {"model_state_dict":net.state_dict(),"optimizer_state_dict":optimizer.state_dict(),"epoch":epoch,"loss":accumulate_loss}
+        torch.save(checkpoint,f"./checkpoint_epoch_{epoch}_loss_{accumulate_loss}.pkl")
+writer.close()
