@@ -1,11 +1,12 @@
 from dataset import StructureRamanDataset
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, random_split
 import pickle
 import json
 from model import MegNet
 import torch
 import time
 from dataloader import collate_fn
+
 
 with open("Structures.pkl","rb") as f:
     structures = pickle.load(f)
@@ -17,21 +18,21 @@ with open("Raman_encoded_JVASP_90000.json","r") as f:
 
 device = torch.device("cuda")
 dataset = StructureRamanDataset(structures,ramans)
-data_loader = DataLoader(dataset=dataset,batch_size=200,collate_fn=collate_fn,num_workers=5,shuffle=True)
+dataset_length = len(dataset)
+_, dataset = random_split(dataset,[int(0.9*dataset_length)+1,int(0.1*dataset_length)])
+data_loader = DataLoader(dataset=dataset,batch_size=128,collate_fn=collate_fn,num_workers=5,shuffle=True)
 net = MegNet()
 net.to(device)
 
 loss_func = torch.nn.MSELoss()
-optimizer = torch.optim.Adam(net.parameters(),lr=1e-4)
-checkpoint = torch.load("./checkpoint_epoch_1901_loss_0.013536745289133654.pkl")
-net.load_state_dict(checkpoint["model_state_dict"])
-optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-start_epoch = checkpoint["epoch"]
+optimizer = torch.optim.Adam(net.parameters())
+schedualer = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer,T_max=64)
 
+prefix = "/home/jlx/v0.2.0/train_overfit/"
 from torch.utils.tensorboard import SummaryWriter
-writer = SummaryWriter()
+writer = SummaryWriter(prefix+"runs")
 
-for epoch in range(start_epoch+1,3002):
+for epoch in range(0,2002):
     start = torch.cuda.Event(enable_timing=True)
     end   = torch.cuda.Event(enable_timing=True)
     start.record()
@@ -51,7 +52,8 @@ for epoch in range(start_epoch+1,3002):
     print(f"Time:{start.elapsed_time(end)}")
     print(f"Loss:{accumulate_loss}")
     writer.add_scalar("Loss vs Epoch",accumulate_loss,epoch)
+    schedualer.step()
     if epoch % 100 == 1:
-        checkpoint = {"model_state_dict":net.state_dict(),"optimizer_state_dict":optimizer.state_dict(),"epoch":epoch,"loss":accumulate_loss}
-        torch.save(checkpoint,f"./checkpoint_epoch_{epoch}_loss_{accumulate_loss}.pkl")
+        checkpoint = {"model_state_dict":net.state_dict(),"optimizer_state_dict":optimizer.state_dict(),"schedual_state_dict":schedualer.state_dict(),"epoch":epoch,"loss":accumulate_loss}
+        torch.save(checkpoint,prefix+f"checkpoint_epoch_{epoch}_loss_{accumulate_loss}.pkl")
 writer.close()
