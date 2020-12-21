@@ -20,7 +20,7 @@ device = torch.device("cuda")
 dataset = StructureRamanDataset(structures,ramans)
 dataset_length = len(dataset)
 _, dataset = random_split(dataset,[int(0.9*dataset_length)+1,int(0.1*dataset_length)])
-data_loader = DataLoader(dataset=dataset,batch_size=128,collate_fn=collate_fn,num_workers=5,shuffle=True)
+data_loader = DataLoader(dataset=dataset,batch_size=4,collate_fn=collate_fn,num_workers=4,shuffle=True)
 net = MegNet()
 net.to(device)
 
@@ -28,7 +28,7 @@ loss_func = torch.nn.MSELoss()
 optimizer = torch.optim.Adam(net.parameters())
 schedualer = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer,T_max=64)
 
-prefix = "/home/jlx/v0.2.0/train_overfit/"
+prefix = "/home/jlx/v0.2.1/1.train_overfit_RReLU/"
 from torch.utils.tensorboard import SummaryWriter
 writer = SummaryWriter(prefix+"runs")
 

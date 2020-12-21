@@ -4,11 +4,11 @@ from torch.nn import Embedding
 from torch_geometric.nn import Set2Set
 
 def ff(input_dim):
-    return torch.nn.Sequential(torch.nn.Linear(input_dim,64),torch.nn.ReLU(),torch.nn.Linear(64,32),torch.nn.ReLU())
+    return torch.nn.Sequential(torch.nn.Linear(input_dim,64),torch.nn.RReLU(),torch.nn.Linear(64,32),torch.nn.RReLU())
 def fff(input_dim):
-    return torch.nn.Sequential(torch.nn.Linear(input_dim,64),torch.nn.ReLU(),torch.nn.Linear(64,64),torch.nn.ReLU(),torch.nn.Linear(64,32),torch.nn.ReLU())
+    return torch.nn.Sequential(torch.nn.Linear(input_dim,64),torch.nn.RReLU(),torch.nn.Linear(64,64),torch.nn.RReLU(),torch.nn.Linear(64,32),torch.nn.RReLU())
 def ff_output(input_dim,output_dim):
-    return torch.nn.Sequential(torch.nn.Linear(input_dim,128),torch.nn.ReLU(),torch.nn.Linear(128,64),torch.nn.ReLU(),torch.nn.Dropout(p=0.5),torch.nn.Linear(64,output_dim))
+    return torch.nn.Sequential(torch.nn.Linear(input_dim,128),torch.nn.RReLU(),torch.nn.Linear(128,64),torch.nn.RReLU(),torch.nn.Dropout(p=0.5),torch.nn.Linear(64,output_dim))
 
 class MegNetLayer(torch.nn.Module):
     def __init__(self) -> None:

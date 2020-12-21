@@ -19,21 +19,27 @@ device = torch.device("cuda")
 dataset = StructureRamanDataset(structures,ramans)
 dataset_length = len(dataset)
 train_set, validate_set = random_split(dataset,[int(0.8*dataset_length)+1,int(0.2*dataset_length)])
-train_dataloader = DataLoader(dataset=train_set,batch_size=128,collate_fn=collate_fn,num_workers=4,shuffle=True)
-validate_dataloader = DataLoader(dataset=validate_set,batch_size=128,collate_fn=collate_fn,num_workers=4,shuffle=True)
+train_dataloader = DataLoader(dataset=train_set,batch_size=64,collate_fn=collate_fn,num_workers=4,shuffle=True)
+validate_dataloader = DataLoader(dataset=validate_set,batch_size=64,collate_fn=collate_fn,num_workers=4,shuffle=True)
 net = MegNet()
 net.to(device)
 
 loss_func = torch.nn.MSELoss()
 optimizer = torch.optim.Adam(net.parameters())
 schedualer = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer,T_max=64)
-prefix = "/home/jlx/v0.2.0/train/"
+prefix = "/home/jlx/v0.2.1/1.train_RReLu/"
+
+# checkpoint = torch.load(prefix+"checkpoint_epoch_101_val_loss_0.0784395659076316.pkl")
+# net.load_state_dict(checkpoint["model_state_dict"])
+# optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+# schedualer.load_state_dict(checkpoint["schedual_state_dict"])
+# last_epoch = checkpoint["epoch"]
 
 
 from torch.utils.tensorboard import SummaryWriter
 writer = SummaryWriter(prefix+"runs")
 
-for epoch in range(0,1000):
+for epoch in range(0,2002):
     start = torch.cuda.Event(enable_timing=True)
     end   = torch.cuda.Event(enable_timing=True)
     start.record()
@@ -65,8 +71,11 @@ for epoch in range(0,1000):
     print(f"train loss:{train_loss}")
     print(f"validate loss:{validate_loss}")
     writer.add_scalars("Train and Validate Loss",{"train_loss":train_loss,"validate_loss":validate_loss},epoch)
+    for name,param in net.named_parameters():
+        writer.add_histogram(name + '_grad', param.grad, epoch)
+        writer.add_histogram(name + '_data', param, epoch)
     schedualer.step()
     if epoch % 100 == 1:
-        checkpoint = {"model_state_dict":net.state_dict(),"optimizer_state_dict":optimizer.state_dict(),"schedual_state_dict":schedualer.state_dict(),"epoch":epoch,"loss":validate_loss}
+        checkpoint = {"model_state_dict":net.state_dict(),"optimizer_state_dict":optimizer.state_dict(),"schedualer_state_dict":schedualer.state_dict(),"epoch":epoch,"loss":validate_loss}
         torch.save(checkpoint,prefix+f"/checkpoint_epoch_{epoch}_val_loss_{validate_loss}.pkl")
 writer.close()
