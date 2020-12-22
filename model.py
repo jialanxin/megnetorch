@@ -8,7 +8,7 @@ def ff(input_dim):
 def fff(input_dim):
     return torch.nn.Sequential(torch.nn.Linear(input_dim,64),torch.nn.SELU(),torch.nn.Linear(64,64),torch.nn.SELU(),torch.nn.Linear(64,32),torch.nn.SELU())
 def ff_output(input_dim,output_dim):
-    return torch.nn.Sequential(torch.nn.Linear(input_dim,128),torch.nn.SELU(),torch.nn.Linear(128,64),torch.nn.SELU(),torch.nn.Dropout(p=0.5),torch.nn.Linear(64,output_dim))
+    return torch.nn.Sequential(torch.nn.Linear(input_dim,128),torch.nn.SELU(),torch.nn.Linear(128,64),torch.nn.SELU(),torch.nn.Linear(64,output_dim))
 
 class MegNetLayer(torch.nn.Module):
     def __init__(self) -> None:

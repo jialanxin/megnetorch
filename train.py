@@ -27,7 +27,7 @@ net.to(device)
 loss_func = torch.nn.MSELoss()
 optimizer = torch.optim.Adam(net.parameters())
 schedualer = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer,T_max=64)
-prefix = "/home/jlx/v0.2.1/2.train_SELU/"
+prefix = "/home/jlx/v0.2.1/3.train_remove_dropout/"
 
 # checkpoint = torch.load(prefix+"checkpoint_epoch_101_val_loss_0.0784395659076316.pkl")
 # net.load_state_dict(checkpoint["model_state_dict"])
