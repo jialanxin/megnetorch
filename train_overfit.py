@@ -28,7 +28,7 @@ loss_func = torch.nn.MSELoss()
 optimizer = torch.optim.Adam(net.parameters())
 schedualer = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer,T_max=64)
 
-prefix = "/home/jlx/v0.2.1/1.train_overfit_RReLU/"
+prefix = "/home/jlx/v0.2.1/2.train_overfit_SELU/"
 from torch.utils.tensorboard import SummaryWriter
 writer = SummaryWriter(prefix+"runs")
 

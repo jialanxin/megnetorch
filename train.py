@@ -27,7 +27,7 @@ net.to(device)
 loss_func = torch.nn.MSELoss()
 optimizer = torch.optim.Adam(net.parameters())
 schedualer = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer,T_max=64)
-prefix = "/home/jlx/v0.2.1/1.train_RReLu/"
+prefix = "/home/jlx/v0.2.1/2.train_SELU/"
 
 # checkpoint = torch.load(prefix+"checkpoint_epoch_101_val_loss_0.0784395659076316.pkl")
 # net.load_state_dict(checkpoint["model_state_dict"])
@@ -71,9 +71,6 @@ for epoch in range(0,2002):
     print(f"train loss:{train_loss}")
     print(f"validate loss:{validate_loss}")
     writer.add_scalars("Train and Validate Loss",{"train_loss":train_loss,"validate_loss":validate_loss},epoch)
-    for name,param in net.named_parameters():
-        writer.add_histogram(name + '_grad', param.grad, epoch)
-        writer.add_histogram(name + '_data', param, epoch)
     schedualer.step()
     if epoch % 100 == 1:
         checkpoint = {"model_state_dict":net.state_dict(),"optimizer_state_dict":optimizer.state_dict(),"schedualer_state_dict":schedualer.state_dict(),"epoch":epoch,"loss":validate_loss}
