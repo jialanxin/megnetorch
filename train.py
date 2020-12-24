@@ -39,7 +39,7 @@ validate_dataloader = DataLoader(
 net = MegNet(num_of_megnetblock=int(model["num_of_megnetblock"] or 3))
 net.to(device)
 
-loss_func = torch.nn.L1Loss()
+loss_func = torch.nn.L1Loss(reduction="none")
 optimizer = torch.optim.Adam(net.parameters())
 schedualer = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=64)
 
@@ -63,7 +63,10 @@ for epoch in range(0, 2002):
         optimizer.zero_grad()
         predicted_spectrum = net(atoms.to(device), state.to(device), bonds.to(device), bond_atom_1.to(
             device), bond_atom_2.to(device), atoms_mark.to(device), bonds_mark.to(device))
-        loss = loss_func(predicted_spectrum, ramans.to(device))
+        loss_matrix = loss_func(predicted_spectrum, ramans.to(device))
+        loss_each_in_batch = loss_matrix.sum(dim=1)
+        ramans_count_each_in_batch = ramans.to(device).sum(dim=1)
+        loss = loss_each_in_batch.div(ramans_count_each_in_batch).mean(dim=0)
         loss.backward()
         train_loss += loss.item()
         optimizer.step()
@@ -76,7 +79,10 @@ for epoch in range(0, 2002):
         net.eval()
         predicted_spectrum = net(atoms.to(device), state.to(device), bonds.to(device), bond_atom_1.to(
             device), bond_atom_2.to(device), atoms_mark.to(device), bonds_mark.to(device))
-        loss = loss_func(predicted_spectrum, ramans.to(device))
+        loss_matrix = loss_func(predicted_spectrum, ramans.to(device))
+        loss_each_in_batch = loss_matrix.sum(dim=1)
+        ramans_count_each_in_batch = ramans.to(device).sum(dim=1)
+        loss = loss_each_in_batch.div(ramans_count_each_in_batch).mean(dim=0)
         validate_loss += loss.item()
     validate_loss = validate_loss/i
     end.record()
