@@ -39,7 +39,7 @@ validate_dataloader = DataLoader(
 net = MegNet(num_of_megnetblock=int(model["num_of_megnetblock"] or 3))
 net.to(device)
 
-loss_func = torch.nn.MSELoss()
+loss_func = torch.nn.L1Loss()
 optimizer = torch.optim.Adam(net.parameters())
 schedualer = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=64)
 
