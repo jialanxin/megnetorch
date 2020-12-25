@@ -39,7 +39,7 @@ validate_dataloader = DataLoader(
 net = MegNet(num_of_megnetblock=int(model["num_of_megnetblock"] or 3))
 net.to(device)
 
-loss_func = torch.nn.L1Loss(reduction="none")
+loss_func = torch.nn.L1Loss()
 optimizer = torch.optim.Adam(net.parameters())
 schedualer = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=64)
 
@@ -57,34 +57,36 @@ for epoch in range(0, 2002):
     end = torch.cuda.Event(enable_timing=True)
     start.record()
     train_loss = 0.0
+    train_similarity = 0.0
     for i, data in enumerate(train_dataloader):
         atoms, state, bonds, bond_atom_1, bond_atom_2, atoms_mark, bonds_mark, ramans = data
         net.train()
         optimizer.zero_grad()
         predicted_spectrum = net(atoms.to(device), state.to(device), bonds.to(device), bond_atom_1.to(
             device), bond_atom_2.to(device), atoms_mark.to(device), bonds_mark.to(device))
-        loss_matrix = loss_func(predicted_spectrum, ramans.to(device))
-        loss_each_in_batch = loss_matrix.sum(dim=1)
-        ramans_count_each_in_batch = ramans.to(device).sum(dim=1)
-        loss = loss_each_in_batch.div(ramans_count_each_in_batch).mean(dim=0)
+        loss = loss_func(predicted_spectrum, ramans.to(device))
         loss.backward()
         train_loss += loss.item()
+        batch_similarity = torch.nn.functional.cosine_similarity(predicted_spectrum, ramans.to(device)).mean()
+        train_similarity += batch_similarity.item()
         optimizer.step()
 
     train_loss = train_loss/i
+    train_similarity = train_similarity/i
 
     validate_loss = 0.0
+    validate_similarity = 0.0
     for i, data in enumerate(validate_dataloader):
         atoms, state, bonds, bond_atom_1, bond_atom_2, atoms_mark, bonds_mark, ramans = data
         net.eval()
         predicted_spectrum = net(atoms.to(device), state.to(device), bonds.to(device), bond_atom_1.to(
             device), bond_atom_2.to(device), atoms_mark.to(device), bonds_mark.to(device))
-        loss_matrix = loss_func(predicted_spectrum, ramans.to(device))
-        loss_each_in_batch = loss_matrix.sum(dim=1)
-        ramans_count_each_in_batch = ramans.to(device).sum(dim=1)
-        loss = loss_each_in_batch.div(ramans_count_each_in_batch).mean(dim=0)
+        loss = loss_func(predicted_spectrum, ramans.to(device))
+        batch_similarity = torch.nn.functional.cosine_similarity(predicted_spectrum, ramans.to(device)).mean()
         validate_loss += loss.item()
+        validate_similarity += batch_similarity.item()
     validate_loss = validate_loss/i
+    validate_similarity = validate_similarity/i
     end.record()
     torch.cuda.synchronize()
     print(f"epoch:{epoch}")
@@ -93,10 +95,12 @@ for epoch in range(0, 2002):
     print(f"validate loss:{validate_loss}")
     writer.add_scalars("Train and Validate Loss", {
                        "train_loss": train_loss, "validate_loss": validate_loss}, epoch)
+    writer.add_scalars("Train and Validate Simi", {
+                       "train_simi": train_similarity, "validate_simi": validate_similarity}, epoch)
     schedualer.step()
     if epoch % 100 == 1:
         checkpoint = {"model_state_dict": net.state_dict(), "optimizer_state_dict": optimizer.state_dict(
         ), "schedualer_state_dict": schedualer.state_dict(), "epoch": epoch, "loss": validate_loss}
         torch.save(checkpoint, prefix +
-                   f"/checkpoint_epoch_{epoch}_val_loss_{validate_loss}.pkl")
+                   f"/checkpoint_epoch_{epoch}_val_loss_{validate_loss:.4f}_val_simi_{validate_similarity:.4f}.pkl")
 writer.close()
