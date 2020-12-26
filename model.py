@@ -1,26 +1,27 @@
 from os import stat
 import torch.nn
 from torch.nn import Embedding
-from torch_geometric.nn import Set2Set,MessagePassing
+from torch_geometric.nn import Set2Set, MessagePassing, BatchNorm
 
 
 def ff(input_dim):
-    return torch.nn.Sequential(torch.nn.Linear(input_dim, 64), torch.nn.RReLU(), torch.nn.Dropout(), torch.nn.Linear(64, 32))
+    return torch.nn.Sequential(torch.nn.Linear(input_dim, 64), BatchNorm(64), torch.nn.RReLU(), torch.nn.Dropout(), torch.nn.Linear(64, 32))
 
 
 def fff(input_dim):
-    return torch.nn.Sequential(torch.nn.Linear(input_dim, 64), torch.nn.RReLU(), torch.nn.Dropout(), torch.nn.Linear(64, 64), torch.nn.RReLU(), torch.nn.Dropout(), torch.nn.Linear(64, 32))
+    return torch.nn.Sequential(torch.nn.Linear(input_dim, 64), BatchNorm(64), torch.nn.RReLU(), torch.nn.Dropout(), torch.nn.Linear(64, 64), BatchNorm(64), torch.nn.RReLU(), torch.nn.Dropout(), torch.nn.Linear(64, 32))
 
 
 def ff_output(input_dim, output_dim):
-    return torch.nn.Sequential(torch.nn.Linear(input_dim, 128), torch.nn.RReLU(), torch.nn.Dropout(), torch.nn.Linear(128, 64), torch.nn.RReLU(), torch.nn.Dropout(), torch.nn.Linear(64, output_dim))
+    return torch.nn.Sequential(torch.nn.Linear(input_dim, 128), BatchNorm(128), torch.nn.RReLU(), torch.nn.Dropout(), torch.nn.Linear(128, 64), BatchNorm(64), torch.nn.RReLU(), torch.nn.Dropout(), torch.nn.Linear(64, output_dim))
 
 
 class EdgeUpdate(torch.nn.Module):
     def __init__(self):
         super().__init__()
         self.phi_e = fff(96)
-    def forward(self,bonds,bond_atom_1,bond_atom_2,atoms):
+
+    def forward(self, bonds, bond_atom_1, bond_atom_2, atoms):
         sum_of_num_bonds = bonds.shape[0]
         atom_info = atoms.shape[1]
         # for ix_bond in range(sum_of_num_bonds):
@@ -34,24 +35,29 @@ class EdgeUpdate(torch.nn.Module):
         atom_1_to_bonds = torch.gather(input=atoms, dim=0, index=bond_atom_1)
         # (sum_of_num_bonds,atom_info)
         atom_2_to_bonds = torch.gather(input=atoms, dim=0, index=bond_atom_2)
-        bonds = torch.cat((atom_1_to_bonds, atom_2_to_bonds, bonds), dim=1)  # (sum_of_num_bonds,atom_info*2+bond_info)
+        # (sum_of_num_bonds,atom_info*2+bond_info)
+        bonds = torch.cat((atom_1_to_bonds, atom_2_to_bonds, bonds), dim=1)
         bonds = self.phi_e(bonds)  # (sum_of_num_bonds,bond_info)
         return bonds
 
+
 class NodeUpdate(MessagePassing):
     def __init__(self):
-        super(NodeUpdate,self).__init__(aggr="mean")
+        super(NodeUpdate, self).__init__(aggr="mean")
         self.phi_v = fff(64)
-    def forward(self,bonds,bond_atom_1,bond_atom_2,atoms):
-        bond_connection = torch.cat((bond_atom_1.unsqueeze(dim=0),bond_atom_2.unsqueeze(dim=0)),dim=0) # (2,sum_of_num_bonds)
-        bonds_to_atoms = self.propagate(bond_connection,edge_attr = bonds) # (sum_of_num_atoms,bond_info)
-        atoms = torch.cat((bonds_to_atoms,atoms),dim=1) # (sum_of_num_atoms,bond_info+atom_info)
-        atoms = self.phi_v(atoms) # (sum_of_num_atoms,atom_info)
+
+    def forward(self, bonds, bond_atom_1, bond_atom_2, atoms):
+        bond_connection = torch.cat((bond_atom_1.unsqueeze(
+            dim=0), bond_atom_2.unsqueeze(dim=0)), dim=0)  # (2,sum_of_num_bonds)
+        # (sum_of_num_atoms,bond_info)
+        bonds_to_atoms = self.propagate(bond_connection, edge_attr=bonds)
+        # (sum_of_num_atoms,bond_info+atom_info)
+        atoms = torch.cat((bonds_to_atoms, atoms), dim=1)
+        atoms = self.phi_v(atoms)  # (sum_of_num_atoms,atom_info)
         return atoms
-    def message(self,edge_attr):
+
+    def message(self, edge_attr):
         return edge_attr
-
-
 
 
 class MegNetLayer(torch.nn.Module):
@@ -59,10 +65,12 @@ class MegNetLayer(torch.nn.Module):
         super().__init__()
         self.edge_update = EdgeUpdate()
         self.node_update = NodeUpdate()
+
     def forward(self, bonds, bond_atom_1, bond_atom_2, atoms):
-        bonds = self.edge_update(bonds,bond_atom_1,bond_atom_2,atoms)
-        atoms = self.node_update(bonds,bond_atom_1,bond_atom_2,atoms)
+        bonds = self.edge_update(bonds, bond_atom_1, bond_atom_2, atoms)
+        atoms = self.node_update(bonds, bond_atom_1, bond_atom_2, atoms)
         return bonds, atoms
+
 
 class FirstMegnetBlock(torch.nn.Module):
     def __init__(self) -> None:
@@ -85,6 +93,7 @@ class FullMegnetBlock(torch.nn.Module):
         self.megnetlayer = MegNetLayer()
         self.atoms_ff = ff(32)
         self.bonds_ff = ff(32)
+
     def forward(self, bonds, bond_atom_1, bond_atom_2, atoms):
         residual_bonds = bonds.clone()
         residual_atoms = atoms.clone()
