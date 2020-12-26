@@ -5,15 +5,15 @@ from torch_geometric.nn import Set2Set, MessagePassing, BatchNorm
 
 
 def ff(input_dim):
-    return torch.nn.Sequential(torch.nn.Linear(input_dim, 64), BatchNorm(64), torch.nn.RReLU(), torch.nn.Dropout(), torch.nn.Linear(64, 32))
+    return torch.nn.Sequential(torch.nn.Linear(input_dim, 64), BatchNorm(64), torch.nn.RReLU(), torch.nn.Linear(64, 32))
 
 
 def fff(input_dim):
-    return torch.nn.Sequential(torch.nn.Linear(input_dim, 64), BatchNorm(64), torch.nn.RReLU(), torch.nn.Dropout(), torch.nn.Linear(64, 64), BatchNorm(64), torch.nn.RReLU(), torch.nn.Dropout(), torch.nn.Linear(64, 32))
+    return torch.nn.Sequential(torch.nn.Linear(input_dim, 64), BatchNorm(64), torch.nn.RReLU(), torch.nn.Linear(64, 64), BatchNorm(64), torch.nn.RReLU(), torch.nn.Linear(64, 32))
 
 
 def ff_output(input_dim, output_dim):
-    return torch.nn.Sequential(torch.nn.Linear(input_dim, 128), BatchNorm(128), torch.nn.RReLU(), torch.nn.Dropout(), torch.nn.Linear(128, 64), BatchNorm(64), torch.nn.RReLU(), torch.nn.Dropout(), torch.nn.Linear(64, output_dim))
+    return torch.nn.Sequential(torch.nn.Linear(input_dim, 128), BatchNorm(128), torch.nn.RReLU(), torch.nn.Linear(128, 64), BatchNorm(64), torch.nn.RReLU(), torch.nn.Linear(64, output_dim))
 
 
 class EdgeUpdate(torch.nn.Module):
