@@ -40,7 +40,7 @@ net = MegNet(num_of_megnetblock=int(model["num_of_megnetblock"] or 3))
 net.to(device)
 
 loss_func = torch.nn.L1Loss()
-optimizer = torch.optim.Adam(net.parameters(),weight_decay=1e-3)
+optimizer = torch.optim.Adam(net.parameters())
 schedualer = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=64)
 
 # checkpoint = torch.load(prefix+"checkpoint_epoch_101_val_loss_0.0784395659076316.pkl")
