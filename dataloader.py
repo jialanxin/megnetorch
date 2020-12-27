@@ -5,7 +5,7 @@ def collate_fn(structure_list):
         inputs,ramans = structure_list[i]
         atoms, state, bonds,bond_atom_1,bond_atom_2,num_atoms,num_bonds = inputs["atoms"],inputs["state"],inputs["bonds"],inputs["bond_atom_1"],inputs["bond_atom_2"],inputs["num_atoms"],inputs["num_bonds"]
         if i == 0 :
-            atoms_of_batch = atoms #(num_atoms,)
+            atoms_of_batch = atoms #(num_atoms,atom_info)
             state_of_batch = state.unsqueeze(dim=0) #(1,2)
             bonds_of_batch = bonds #(num_bonds,bond_info)
             bond_atom_1_of_batch = bond_atom_1 #(num_bonds,)
@@ -14,7 +14,7 @@ def collate_fn(structure_list):
             batch_mark_for_bonds = torch.LongTensor([i for count in range(num_bonds)]) #(num_of_bonds,)
             ramans_of_batch = ramans.unsqueeze(dim=0) #(1,raman_size)
         else:
-            atoms_of_batch = torch.cat((atoms_of_batch,atoms),dim=0)  #(sum_of_num_atoms,)
+            atoms_of_batch = torch.cat((atoms_of_batch,atoms),dim=0)  #(sum_of_num_atoms,atom_info)
             bonds_of_batch = torch.cat((bonds_of_batch,bonds),dim=0)  #(sum_of_num_bonds,bond_info)
             bond_atom_1 = bond_atom_1+batch_mark_for_atoms.shape[0]
             bond_atom_1_of_batch = torch.cat((bond_atom_1_of_batch,bond_atom_1),dim=0) #(sum_of_num_bonds,)

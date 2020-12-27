@@ -1,4 +1,4 @@
-from utils.graph import CrystalGraph
+from utils.graph import CrystalGraphWithAtomicFeatures
 from torch.utils.data import Dataset
 import torch
 
@@ -13,7 +13,7 @@ class StructureRamanDataset(Dataset):
         for i in range(length):
             structure = structures[i]
             raman = torch.FloatTensor(ramans[i])
-            graph = CrystalGraph(structure)
+            graph = CrystalGraphWithAtomicFeatures(structure)
             input = graph.convert_to_model_input()
             couples.append((input,raman))
         return couples

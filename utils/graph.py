@@ -43,3 +43,31 @@ class CrystalGraph:
         input = {"atoms":atoms,"state":state,"bonds":bonds,"bond_atom_1":bond_atom_1,"bond_atom_2":bond_atom_2,"num_atoms":num_atoms,"num_bonds":num_bonds}
         return input
 
+class CrystalGraphWithAtomicFeatures(CrystalGraph):
+    def __init__(self,structure):
+        super(CrystalGraphWithAtomicFeatures,self).__init__(structure)
+        self.atoms = [i.specie for i in structure]
+        self.num_atoms = len(self.atoms)
+    def encoded_atom_periods(self):
+        periods = torch.LongTensor([i.row for i in self.atoms])
+        encoded = torch.zeros((self.num_atoms,9)) # (num_atoms,9)
+        for i,period in enumerate(periods):
+            encoded[i,period-1] = 1
+        return encoded
+    def encoded_atom_groups(self):
+        groups = torch.LongTensor([i.group for i in self.atoms])
+        encoded = torch.zeros((self.num_atoms,18)) # (num_atoms,18)
+        for i,group in enumerate(groups):
+            encoded[i,group-1] = 1
+        return encoded
+    def convert_to_model_input(self):
+        atoms = torch.cat((self.encoded_atom_groups(),self.encoded_atom_periods()),dim=1)
+        state = torch.FloatTensor(self.state)
+        bonds = torch.FloatTensor(self.encode_bond_length_with_Gaussian_distance())
+        bond_atom_1 = torch.LongTensor(self.bond_atom_1)
+        bond_atom_2 = torch.LongTensor(self.bond_atom_2)
+        num_atoms = atoms.shape[0]
+        num_bonds = bonds.shape[0]
+        input = {"atoms":atoms,"state":state,"bonds":bonds,"bond_atom_1":bond_atom_1,"bond_atom_2":bond_atom_2,"num_atoms":num_atoms,"num_bonds":num_bonds}
+        return input
+

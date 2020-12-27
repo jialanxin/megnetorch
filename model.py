@@ -109,8 +109,7 @@ class FullMegnetBlock(torch.nn.Module):
 class MegNet(torch.nn.Module):
     def __init__(self, num_of_megnetblock) -> None:
         super().__init__()
-        self.atomic_embedding = Embedding(95, 16)
-        self.atom_preblock = ff(16)
+        self.atom_preblock = ff(27)
         self.bond_preblock = ff(100)
         self.firstblock = FirstMegnetBlock()
         self.fullblocks = torch.nn.ModuleList(
@@ -120,10 +119,8 @@ class MegNet(torch.nn.Module):
         self.output_layer = ff_output(input_dim=128, output_dim=200)
 
     def forward(self, atoms, state, bonds, bond_atom_1, bond_atom_2, batch_mark_for_atoms, batch_mark_for_bonds):
-        atoms_embedded = self.atomic_embedding(
-            atoms)  # (sum_of_num_atoms,atom_info)
         # (sum_of_num_atoms,atom_info)
-        atoms = self.atom_preblock(atoms_embedded)
+        atoms = self.atom_preblock(atoms)
         bonds = self.bond_preblock(bonds)  # (sum_of_num_bonds,bond_info)
         bonds, atoms = self.firstblock(
             bonds, bond_atom_1, bond_atom_2, atoms)
