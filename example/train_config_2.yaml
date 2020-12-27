@@ -1,4 +1,4 @@
 prefix:
-  "/home/jlx/v0.3.0/6.train_baseline/"
+  "/home/jlx/v0.3.1/2.train_3_atom_features/"
 model:
   num_of_megnetblock : 4
