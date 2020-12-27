@@ -66,7 +66,7 @@ class CrystalGraphWithAtomicFeatures(CrystalGraph):
         results = torch.exp(-(masses[:,None] - centers[None,:])**2/0.5**2)
         return results
     def convert_to_model_input(self):
-        atoms = torch.cat((self.encoded_atom_groups(),self.encoded_atom_periods(),self.encoded_atom_mass()),dim=1)
+        atoms = torch.cat((self.encoded_atom_groups(),self.encoded_atom_periods()),dim=1)
         state = torch.FloatTensor(self.state)
         bonds = torch.FloatTensor(self.encode_bond_length_with_Gaussian_distance())
         bond_atom_1 = torch.LongTensor(self.bond_atom_1)

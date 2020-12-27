@@ -109,7 +109,7 @@ class FullMegnetBlock(torch.nn.Module):
 class MegNet(torch.nn.Module):
     def __init__(self, num_of_megnetblock) -> None:
         super().__init__()
-        self.atom_preblock = ff(128)
+        self.atom_preblock = ff(27)
         self.bond_preblock = ff(100)
         self.firstblock = FirstMegnetBlock()
         self.fullblocks = torch.nn.ModuleList(
