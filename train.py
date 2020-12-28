@@ -40,7 +40,19 @@ net = MegNet(num_of_megnetblock=int(model["num_of_megnetblock"] or 3))
 net.to(device)
 
 loss_func = torch.nn.L1Loss()
-optimizer = torch.optim.Adam(net.parameters())
+
+
+def determine_optimizer(config):
+    optimizer_config = config["optimizer"]
+    try:
+        lr = float(optimizer_config["lr"])
+        optimizer = torch.optim.Adam(net.parameters(),lr=lr)
+        print(f"Learnging Rate: {lr:.2e}")
+    except:
+        optimizer = torch.optim.Adam(net.parameters())
+    return optimizer
+optimizer = determine_optimizer(config)
+
 schedualer = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=64)
 
 # checkpoint = torch.load(prefix+"checkpoint_epoch_101_val_loss_0.0784395659076316.pkl")
