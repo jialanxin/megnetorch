@@ -43,14 +43,28 @@ loss_func = torch.nn.L1Loss()
 
 
 def determine_optimizer(config):
-    optimizer_config = config["optimizer"]
+    params = {}
     try:
-        lr = float(optimizer_config["lr"])
-        optimizer = torch.optim.Adam(net.parameters(),lr=lr)
-        print(f"Learnging Rate: {lr:.2e}")
+        optimizer_config = config["optimizer"]
+        try:
+            lr = float(optimizer_config["lr"])
+            params["lr"] = lr
+            print(f"Learnging Rate: {lr:.2e}")
+        except:
+            pass
+        try:
+            weight_decay = float(optimizer_config["weight_decay"])
+            params["weight_decay"] = weight_decay
+        except:
+            pass
+        if optimizer_config["type"] == "AdamW":
+            return torch.optim.AdamW(net.parameters(), **params)
+        else:
+            return torch.optim.Adam(net.parameters(), **params)
     except:
-        optimizer = torch.optim.Adam(net.parameters())
-    return optimizer
+        return torch.optim.Adam(net.parameters(), **params)
+
+
 optimizer = determine_optimizer(config)
 
 schedualer = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=64)
@@ -79,7 +93,8 @@ for epoch in range(0, 2002):
         loss = loss_func(predicted_spectrum, ramans.to(device))
         loss.backward()
         train_loss += loss.item()
-        batch_similarity = torch.nn.functional.cosine_similarity(predicted_spectrum, ramans.to(device)).mean()
+        batch_similarity = torch.nn.functional.cosine_similarity(
+            predicted_spectrum, ramans.to(device)).mean()
         train_similarity += batch_similarity.item()
         optimizer.step()
 
@@ -94,7 +109,8 @@ for epoch in range(0, 2002):
         predicted_spectrum = net(atoms.to(device), state.to(device), bonds.to(device), bond_atom_1.to(
             device), bond_atom_2.to(device), atoms_mark.to(device), bonds_mark.to(device))
         loss = loss_func(predicted_spectrum, ramans.to(device))
-        batch_similarity = torch.nn.functional.cosine_similarity(predicted_spectrum, ramans.to(device)).mean()
+        batch_similarity = torch.nn.functional.cosine_similarity(
+            predicted_spectrum, ramans.to(device)).mean()
         validate_loss += loss.item()
         validate_similarity += batch_similarity.item()
     validate_loss = validate_loss/i

@@ -1,4 +1,6 @@
 prefix:
-  "/home/jlx/v0.3.0/4.train_BN/"
+  "/home/jlx/v0.3.2/2.train_L2/"
 model:
   num_of_megnetblock : 4
+optimizer:
+  type: "AdamW"
