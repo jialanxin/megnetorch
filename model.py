@@ -1,7 +1,7 @@
 from os import stat
 import torch.nn
 from torch.nn import Embedding
-from torch_geometric.nn import Set2Set, MessagePassing, BatchNorm
+from torch_geometric.nn import Set2Set, MessagePassing, BatchNorm, CGConv
 
 
 def ff(input_dim):
@@ -64,11 +64,13 @@ class MegNetLayer(torch.nn.Module):
     def __init__(self) -> None:
         super().__init__()
         self.edge_update = EdgeUpdate()
-        self.node_update = NodeUpdate()
+        self.node_update = CGConv(32,32)
 
     def forward(self, bonds, bond_atom_1, bond_atom_2, atoms):
         bonds = self.edge_update(bonds, bond_atom_1, bond_atom_2, atoms)
-        atoms = self.node_update(bonds, bond_atom_1, bond_atom_2, atoms)
+        bond_connection = torch.cat((bond_atom_1.unsqueeze(
+            dim=0), bond_atom_2.unsqueeze(dim=0)), dim=0)  # (2,sum_of_num_bonds)
+        atoms = self.node_update(atoms,bond_connection,bonds)
         return bonds, atoms
 
 
