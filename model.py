@@ -9,7 +9,7 @@ def ff(input_dim):
 
 
 def fff(input_dim):
-    return torch.nn.Sequential(torch.nn.Linear(input_dim, 64), torch.nn.RReLU(), torch.nn.Linear(64, 64), torch.nn.RReLU(), torch.nn.Linear(64, 32))
+    return torch.nn.Sequential(torch.nn.Linear(input_dim, 128), torch.nn.RReLU(), torch.nn.Linear(128, 64), torch.nn.RReLU(), torch.nn.Linear(64, 32))
 
 
 def ff_output(input_dim, output_dim):
@@ -63,7 +63,7 @@ class NodeUpdate(MessagePassing):
 class MegNetLayer(torch.nn.Module):
     def __init__(self) -> None:
         super().__init__()
-        self.node_update = GINEConv(ff(32))
+        self.node_update = GINEConv(fff(32))
         self.edge_update = EdgeUpdate()
 
     def forward(self, bonds, bond_atom_1, bond_atom_2, atoms):
