@@ -14,8 +14,8 @@ class StructureRamanDataset(Dataset):
             structure = structures[i]
             raman = torch.FloatTensor(ramans[i])
             graph = CrystalGraph(structure)
-            input = graph.convert_to_model_input()
-            couples.append((input,raman))
+            encoded_graph = graph.convert_to_model_input()
+            couples.append((encoded_graph,raman))
         return couples
     def __init__(self,structures,ramans) -> None:
         super().__init__()
