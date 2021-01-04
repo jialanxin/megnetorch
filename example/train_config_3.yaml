@@ -1,6 +1,6 @@
 prefix:
-  "/home/jlx/v0.3.5/3.train_lr_5e-4/"
+  "/home/jlx/v0.3.6/3.train_num_5/"
 model:
-  num_of_megnetblock : 4
+  num_of_megnetblock : 5
 optimizer:
-  lr: 5e-4
+        lr: 1e-4
