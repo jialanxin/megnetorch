@@ -1,7 +1,4 @@
 prefix:
-  "/home/jlx/v0.3.7/2.num_20/"
+  "/home/jlx/v0.3.8/8.num_120_msg_norm/"
 model:
-  num_of_megnetblock : 20
-optimizer:
-  type: "AdamW"
-  weight_decay: 0.2
+  num_of_megnetblock : 120

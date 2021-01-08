@@ -63,7 +63,7 @@ class NodeUpdate(MessagePassing):
 class MegNetLayer(torch.nn.Module):
     def __init__(self) -> None:
         super().__init__()
-        conv = GENConv(32,32,norm="layer")
+        conv = GENConv(32,32,norm="layer",msg_norm=True)
         act = RReLU()
         norm = LayerNorm(32,affine=True)
         self.node_gcn = DeepGCNLayer(conv,norm=norm,act=act)
@@ -111,7 +111,7 @@ class MegNet(torch.nn.Module):
             [FirstMegnetBlock() for i in range(num_of_megnetblock)])
         self.set2set_v = Set2Set(in_channels=32, processing_steps=3)
         self.set2set_e = Set2Set(in_channels=32, processing_steps=3)
-        self.output_layer = ff_output(input_dim=128, output_dim=200)
+        self.output_layer = ff_output(input_dim=128, output_dim=41)
 
     def forward(self, atoms, bonds, bond_atom_1, bond_atom_2, batch_mark_for_atoms, batch_mark_for_bonds):
         atoms_embedded = self.atomic_embedding(

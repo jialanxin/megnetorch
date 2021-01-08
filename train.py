@@ -23,16 +23,21 @@ with open(path_to_file, "r") as f:
 prefix = config["prefix"]
 
 
-with open("Structures.pkl", "rb") as f:
-    structures = pickle.load(f)
+def prepare_datesets(struct_file,raman_file):
+    with open(struct_file, "rb") as f:
+        structures = pickle.load(f)
+    with open(raman_file, "r") as f:
+        ramans = json.loads(f.read())
+    dataset = StructureRamanDataset(structures, ramans)
+    return dataset
 
-with open("Raman_encoded_JVASP_90000.json", "r") as f:
-    ramans = json.loads(f.read())
 
-dataset = StructureRamanDataset(structures, ramans)
-dataset_length = len(dataset)
-train_set, validate_set = random_split(
-    dataset, [int(0.8*dataset_length)+1, int(0.2*dataset_length)])
+
+
+
+train_set = prepare_datesets("./materials/JVASP/Train_Structures.pkl","./materials/JVASP/Train_ramans.json")
+validate_set = prepare_datesets("./materials/JVASP/Valid_Structures.pkl","./materials/JVASP/Valid_ramans.json")
+
 train_dataloader = DataLoader(
     dataset=train_set, batch_size=64, collate_fn=collate_fn, num_workers=4, shuffle=True)
 validate_dataloader = DataLoader(
@@ -43,6 +48,7 @@ class Experiment(pl.LightningModule):
     def __init__(self,num_conv=3, optim_type="Adam",lr=1e-3,weight_decay=0.0):
         super().__init__()
         self.save_hyperparameters()
+        self.lr = lr
         self.net = MegNet(num_of_megnetblock=self.hparams.num_conv)
         
 
@@ -75,9 +81,9 @@ class Experiment(pl.LightningModule):
 
     def configure_optimizers(self):
         if self.hparams.optim_type == "AdamW":
-            optimizer = torch.optim.AdamW(self.parameters(), lr=self.hparams.lr,weight_decay=self.hparams.weight_decay)
+            optimizer = torch.optim.AdamW(self.parameters(), lr=self.lr,weight_decay=self.hparams.weight_decay)
         else:
-            optimizer = torch.optim.Adam(self.parameters(), lr=self.hparams.lr,weight_decay=self.hparams.weight_decay)
+            optimizer = torch.optim.Adam(self.parameters(), lr=self.lr,weight_decay=self.hparams.weight_decay)
         schedualer = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=64)
         return [optimizer],[schedualer]
 
@@ -116,5 +122,6 @@ logger = TensorBoardLogger(prefix)
 model_hpparams = model_config(config)
 print(model_hpparams)
 experiment = Experiment(**model_hpparams)
-trainer = pl.Trainer(gpus=1, logger=logger,callbacks=[checkpoint_callback])
+trainer = pl.Trainer(gpus=1, logger=logger,callbacks=[checkpoint_callback], auto_lr_find=True)
+trainer.tune(experiment,train_dataloader,validate_dataloader)
 trainer.fit(experiment, train_dataloader, validate_dataloader)
