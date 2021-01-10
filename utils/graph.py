@@ -5,6 +5,16 @@ from pymatgen.optimization.neighbors import find_points_in_spheres
 import numpy as np
 import torch
 
+def range_encode(value,min,max,steps):
+    value = torch.Tensor([value])
+    range_space = torch.linspace(min,max,steps)
+    greater = torch.greater_equal(value,range_space).sum()
+    encoded = torch.zeros_like(range_space)
+    encoded[greater-1] += 1
+    return encoded
+
+
+
 
 class EncodedGraph:
     def __init__(self, atoms, bonds, bond_atom_1, bond_atom_2, num_atoms, num_bonds):

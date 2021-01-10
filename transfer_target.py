@@ -121,7 +121,7 @@ def model_config(model):
 logger = TensorBoardLogger(prefix)
 model_hpparams = model_config(config)
 print(model_hpparams)
-experiment = Experiment(**model_hpparams)
+experiment = Experiment.load_from_checkpoint("/home/jlx/v0.3.9/2.num_10_transfer/default/version_2/checkpoints/epoch=879-step=99439.ckpt",**model_hpparams)
 
 trainer_config = config["trainer"]
 if trainer_config == "tune":

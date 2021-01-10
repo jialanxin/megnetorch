@@ -1,6 +1,6 @@
 from pytorch_lightning.loggers import TensorBoardLogger
 from torch.utils.tensorboard import SummaryWriter
-from dataset import StructureRamanDataset
+from dataset import StructureFmtEnDataset
 from torch.utils.data import DataLoader, random_split
 import pickle
 import json
@@ -23,34 +23,21 @@ with open(path_to_file, "r") as f:
 prefix = config["prefix"]
 
 
-def prepare_datesets(struct_file,raman_file):
-    with open(struct_file, "rb") as f:
-        structures = pickle.load(f)
-    with open(raman_file, "r") as f:
-        ramans = json.loads(f.read())
-    dataset = StructureRamanDataset(structures, ramans)
-    return dataset
-
-
-
-
-
-train_set = prepare_datesets("./materials/JVASP/Train_Structures.pkl","./materials/JVASP/Train_ramans.json")
-validate_set = prepare_datesets("./materials/JVASP/Valid_Structures.pkl","./materials/JVASP/Valid_ramans.json")
+train_set = torch.load("./materials/mp/Train_set.pt")
+validate_set = torch.load("./materials/mp/Valid_set.pt")
 
 train_dataloader = DataLoader(
-    dataset=train_set, batch_size=64, collate_fn=collate_fn, num_workers=4, shuffle=True)
+        dataset=train_set, batch_size=64, collate_fn=collate_fn, num_workers=4)
 validate_dataloader = DataLoader(
-    dataset=validate_set, batch_size=64, collate_fn=collate_fn, num_workers=4)
+        dataset=validate_set, batch_size=64, collate_fn=collate_fn, num_workers=4)
 
 
 class Experiment(pl.LightningModule):
-    def __init__(self,num_conv=3, optim_type="Adam",lr=1e-3,weight_decay=0.0):
+    def __init__(self, num_conv=3, optim_type="Adam", lr=1e-3, weight_decay=0.0):
         super().__init__()
         self.save_hyperparameters()
         self.lr = lr
         self.net = MegNet(num_of_megnetblock=self.hparams.num_conv)
-        
 
     def forward(self, batch):
         atoms, bonds, bond_atom_1, bond_atom_2, _, _, batch_mark_for_atoms, batch_mark_for_bonds, _ = batch
@@ -68,6 +55,7 @@ class Experiment(pl.LightningModule):
             predicted_spectrum, ramans_of_batch).mean()
         self.log("train_simi", similarity, on_epoch=True, on_step=False)
         return {"loss": loss, "simi": similarity}
+
     def validation_step(self, batch, batch_idx):
         atoms, bonds, bond_atom_1, bond_atom_2, _, _, batch_mark_for_atoms, batch_mark_for_bonds, ramans_of_batch = batch
         predicted_spectrum = self.net(
@@ -81,17 +69,22 @@ class Experiment(pl.LightningModule):
 
     def configure_optimizers(self):
         if self.hparams.optim_type == "AdamW":
-            optimizer = torch.optim.AdamW(self.parameters(), lr=self.lr,weight_decay=self.hparams.weight_decay)
+            optimizer = torch.optim.AdamW(
+                self.parameters(), lr=self.lr, weight_decay=self.hparams.weight_decay)
         else:
-            optimizer = torch.optim.Adam(self.parameters(), lr=self.lr,weight_decay=self.hparams.weight_decay)
-        schedualer = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=64)
-        return [optimizer],[schedualer]
+            optimizer = torch.optim.Adam(
+                self.parameters(), lr=self.lr, weight_decay=self.hparams.weight_decay)
+        schedualer = torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer, T_max=64)
+        return [optimizer], [schedualer]
+
 
 checkpoint_callback = ModelCheckpoint(
     monitor='val_simi',
     save_top_k=3,
     mode='max',
 )
+
 
 def model_config(model):
     params = {}
@@ -117,6 +110,7 @@ def model_config(model):
     except:
         pass
     return params
+
 
 logger = TensorBoardLogger(prefix)
 model_hpparams = model_config(config)
