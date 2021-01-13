@@ -1,7 +1,9 @@
 prefix:
-  "/home/jlx/v0.3.9/1.num_10"
+  "/home/jlx/v0.3.10/4.3_layer_original_megnet_transfer_target/"
 model:
-  num_of_megnetblock : 10
+  num_of_megnetblock : 3
 optimizer:
-  lr: 2e-3
+  lr: 1e-3
+  type: "AdamW"
+  weight_decay: 1e-2
 trainer: "fit"

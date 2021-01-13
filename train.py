@@ -118,17 +118,27 @@ def model_config(model):
         pass
     return params
 
-logger = TensorBoardLogger(prefix)
-model_hpparams = model_config(config)
-print(model_hpparams)
-experiment = Experiment(**model_hpparams)
+try: 
+    path = config["checkpoint"]
+    experiment = Experiment.load_from_checkpoint(path)
+except KeyError:
+    model_hpparams = model_config(config)
+    print(model_hpparams)
+    experiment = Experiment(**model_hpparams)
+
+    
 
 trainer_config = config["trainer"]
+logger = TensorBoardLogger(prefix)
 if trainer_config == "tune":
     trainer = pl.Trainer(gpus=1, logger=logger, callbacks=[
                          checkpoint_callback], auto_lr_find=True)
     trainer.tune(experiment, train_dataloader, validate_dataloader)
 else:
-    trainer = pl.Trainer(gpus=1, logger=logger,
+    try: 
+        path = config["checkpoint"]
+        trainer = pl.Trainer(resume_from_checkpoint=path,gpus=1, logger=logger, callbacks=[checkpoint_callback],max_epochs=2000)
+    except KeyError:
+        trainer = pl.Trainer(gpus=1, logger=logger,
                          callbacks=[checkpoint_callback])
     trainer.fit(experiment, train_dataloader, validate_dataloader)

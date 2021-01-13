@@ -1,6 +1,6 @@
 from os import stat
 import torch.nn
-from torch.nn import Embedding,RReLU
+from torch.nn import Embedding,RReLU,ReLU
 from torch_geometric.nn import Set2Set, MessagePassing, BatchNorm, CGConv, GINEConv,GENConv,DeepGCNLayer,LayerNorm
 
 
@@ -63,15 +63,19 @@ class NodeUpdate(MessagePassing):
 class MegNetLayer(torch.nn.Module):
     def __init__(self) -> None:
         super().__init__()
-        conv = GENConv(32,32,norm="layer",msg_norm=True)
-        act = RReLU()
-        norm = LayerNorm(32,affine=True)
-        self.node_gcn = DeepGCNLayer(conv,norm=norm,act=act)
+        # conv = GENConv(32,32,norm="layer",msg_norm=True)
+        # act = ReLU()
+        # norm = LayerNorm(32,affine=True)
+        # self.node_gcn = DeepGCNLayer(conv,norm=norm,act=act)
+        self.node_update = NodeUpdate()
+        self.edge_update = EdgeUpdate()
     def forward(self, bonds, bond_atom_1, bond_atom_2, atoms):
-        bond_connection = torch.cat((bond_atom_1.unsqueeze(
-            dim=0), bond_atom_2.unsqueeze(dim=0)), dim=0)  # (2,sum_of_num_bonds)
-        atoms = self.node_gcn(atoms,bond_connection,bonds)
-        return atoms
+        # bond_connection = torch.cat((bond_atom_1.unsqueeze(
+            # dim=0), bond_atom_2.unsqueeze(dim=0)), dim=0)  # (2,sum_of_num_bonds)
+        # atoms = self.node_gcn(atoms,bond_connection,bonds)
+        bonds = self.edge_update(bonds,bond_atom_1,bond_atom_2,atoms)
+        atoms = self.node_update(bonds,bond_atom_1,bond_atom_2,atoms)
+        return atoms,bonds
 
 
 class FirstMegnetBlock(torch.nn.Module):
@@ -80,9 +84,11 @@ class FirstMegnetBlock(torch.nn.Module):
         self.megnetlayer = MegNetLayer()
 
     def forward(self, bonds, bond_atom_1, bond_atom_2, atoms):
-        atoms = self.megnetlayer(
+        res_atoms,res_bonds = self.megnetlayer(
             bonds, bond_atom_1, bond_atom_2, atoms)
-        return atoms
+        bonds = bonds + res_bonds
+        atoms = atoms + res_atoms
+        return atoms,bonds
 
 
 class FullMegnetBlock(torch.nn.Module):
@@ -90,12 +96,16 @@ class FullMegnetBlock(torch.nn.Module):
         super().__init__()
         self.megnetlayer = MegNetLayer()
         self.atoms_ff = ff(32)
+        self.bonds_ff = ff(32)
 
     def forward(self, bonds, bond_atom_1, bond_atom_2, atoms):
-        atoms = self.atoms_ff(atoms)
-        atoms = self.megnetlayer(
-            bonds, bond_atom_1, bond_atom_2, atoms)
-        return atoms
+        res_atoms = self.atoms_ff(atoms)
+        res_bonds = self.bonds_ff(bonds)
+        res_atoms,res_bonds = self.megnetlayer(
+            res_bonds, bond_atom_1, bond_atom_2, res_atoms)
+        atoms = atoms + res_atoms
+        bonds = bonds + res_bonds
+        return atoms,bonds
 
 
 class MegNet(torch.nn.Module):
@@ -104,11 +114,11 @@ class MegNet(torch.nn.Module):
         self.atomic_embedding = Embedding(95, 16)
         self.atom_preblock = ff(16)
         self.bond_preblock = ff(100)
-        # self.firstblock = FirstMegnetBlock()
-        # self.fullblocks = torch.nn.ModuleList(
-        #     [FullMegnetBlock() for i in range(num_of_megnetblock)])
-        self.blocks = torch.nn.ModuleList(
-            [FirstMegnetBlock() for i in range(num_of_megnetblock)])
+        self.firstblock = FirstMegnetBlock()
+        self.fullblocks = torch.nn.ModuleList(
+            [FullMegnetBlock() for i in range(num_of_megnetblock)])
+        # self.blocks = torch.nn.ModuleList(
+            # [FirstMegnetBlock() for i in range(num_of_megnetblock)])
         self.set2set_v = Set2Set(in_channels=32, processing_steps=3)
         self.set2set_e = Set2Set(in_channels=32, processing_steps=3)
         self.output_layer = ff_output(input_dim=128, output_dim=41)
@@ -119,10 +129,10 @@ class MegNet(torch.nn.Module):
         # (sum_of_num_atoms,atom_info)
         atoms = self.atom_preblock(atoms_embedded)
         bonds = self.bond_preblock(bonds)  # (sum_of_num_bonds,bond_info)
-        # atoms = self.firstblock(
-        #     bonds, bond_atom_1, bond_atom_2, atoms)
-        for block in self.blocks:
-            atoms = block(
+        atoms,bonds = self.firstblock(
+            bonds, bond_atom_1, bond_atom_2, atoms)
+        for block in self.fullblocks:
+            atoms,bonds = block(
                 bonds, bond_atom_1, bond_atom_2, atoms)
         batch_size = batch_mark_for_bonds.max()+1
         # print(batch_size)
