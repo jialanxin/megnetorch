@@ -1,7 +1,7 @@
 prefix:
   "/home/jlx/v0.3.11/4.10_layer_original_megnet_output_dropout_0.2/"
 model:
-  num_of_megnetblock : 10
+  num_of_megnetblock : 3
 optimizer:
   lr: 1e-3
   type: "AdamW"
