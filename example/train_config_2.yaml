@@ -1,4 +1,10 @@
 prefix:
-  "/home/jlx/v0.3.1/2.train_3_atom_features/"
+  "/home/jlx/v0.3.10/5.10_layer_original_megnet/"
 model:
-  num_of_megnetblock : 4
+  num_of_megnetblock : 10
+trainer: "fit"
+optimizer:
+        lr: 1e-3
+        type: "AdamW"
+        weight_decay: 1e-2
+checkpoint: "/home/jlx/v0.3.10/5.10_layer_original_megnet/default/version_0/checkpoints/epoch=977-step=110513.ckpt"
