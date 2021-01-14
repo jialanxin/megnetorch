@@ -1,7 +1,10 @@
 prefix:
-  "/home/jlx/v0.3.9/1.num_10"
+  "/home/jlx/v0.3.11/4.10_layer_original_megnet_output_dropout_0.2/"
 model:
   num_of_megnetblock : 10
 optimizer:
-  lr: 2e-3
+  lr: 1e-3
+  type: "AdamW"
+  weight_decay: 1e-2
 trainer: "fit"
+#checkpoint: "/home/jlx/v0.3.11/2.10_layer_original_megnet_output_dropout_0.1/default/version_0/checkpoints/epoch=975-step=110287.ckpt"

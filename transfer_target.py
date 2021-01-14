@@ -4,7 +4,7 @@ from dataset import StructureRamanDataset
 from torch.utils.data import DataLoader, random_split
 import pickle
 import json
-from model import MegNet
+from model import MegNet,Set2Set
 import torch
 import time
 from dataloader import collate_fn
@@ -13,6 +13,7 @@ import argparse
 import pytorch_lightning as pl
 import torch.nn.functional as F
 from pytorch_lightning.callbacks import ModelCheckpoint
+from model import ff_output
 
 parser = argparse.ArgumentParser(description="Select a train_config.yaml file")
 parser.add_argument(dest="filename", metavar="/path/to/file")
@@ -87,6 +88,19 @@ class Experiment(pl.LightningModule):
         schedualer = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=64)
         return [optimizer],[schedualer]
 
+class Transfer(Experiment):
+    def __init__(self,checkpoint,num_conv=3, optim_type="Adam",lr=1e-3,weight_decay=0.0):
+        super().__init__(num_conv,optim_type,lr,weight_decay)
+        source = Experiment.load_from_checkpoint(checkpoint)
+        source.freeze()
+        source.net.output_layer = ff_output(128,41)
+        source.net.set2set_e = Set2Set(in_channels=32, processing_steps=3)
+        source.net.set2set_v = Set2Set(in_channels=32, processing_steps=3)
+        self.net = source.net
+        self.save_hyperparameters()
+        self.lr = lr
+
+
 checkpoint_callback = ModelCheckpoint(
     monitor='val_simi',
     save_top_k=3,
@@ -121,14 +135,14 @@ def model_config(model):
 logger = TensorBoardLogger(prefix)
 model_hpparams = model_config(config)
 print(model_hpparams)
-experiment = Experiment.load_from_checkpoint("/home/jlx/v0.3.9/2.num_10_transfer/default/version_2/checkpoints/epoch=879-step=99439.ckpt",**model_hpparams)
+transfer = Transfer("/home/jlx/v0.3.10/3.3_layer_original_megnet_transfer_source/default/version_0/checkpoints/epoch=706-step=1080295.ckpt",**model_hpparams)
 
 trainer_config = config["trainer"]
 if trainer_config == "tune":
     trainer = pl.Trainer(gpus=1, logger=logger, callbacks=[
                          checkpoint_callback], auto_lr_find=True)
-    trainer.tune(experiment, train_dataloader, validate_dataloader)
+    trainer.tune(transfer, train_dataloader, validate_dataloader)
 else:
     trainer = pl.Trainer(gpus=1, logger=logger,
-                         callbacks=[checkpoint_callback])
-    trainer.fit(experiment, train_dataloader, validate_dataloader)
+                         callbacks=[checkpoint_callback],max_epochs=2000)
+    trainer.fit(transfer, train_dataloader, validate_dataloader)
