@@ -5,6 +5,7 @@ from pymatgen.optimization.neighbors import find_points_in_spheres
 import numpy as np
 import torch
 import json
+import re
 
 def range_encode(value,min,max,steps):
     value = torch.Tensor([value])
@@ -64,6 +65,22 @@ class CrystalGraph:
         for i, atom in enumerate(self.atoms):
             encoded_atomic_groups[i,atom.group-1] = 1
         return encoded_atomic_groups
+    @property
+    def get_atomic_blocks(self):
+        num_atoms = self.num_atoms
+        encoded_atomic_groups = torch.zeros((num_atoms,4),dtype=torch.float)
+        for i, atom in enumerate(self.atoms):
+            block = atom.block
+            if block == "s":
+                id = 0
+            elif block == "p":
+                id = 1
+            elif block == "d":
+                id = 2
+            elif block == "f":
+                id =3
+            encoded_atomic_groups[i,id] = 1
+        return encoded_atomic_groups
     @staticmethod
     def Gassian_expand(value_list,min_value,max_value,intervals,expand_width):
         centers = torch.linspace(min_value,max_value,intervals)
@@ -89,6 +106,31 @@ class CrystalGraph:
         cov_rad_list = [covalence_radius_table[Z-1] for Z in self.atomic_numbers]
         encoded_cov_rad = self.Gassian_expand(cov_rad_list,50,250,10,20)
         return encoded_cov_rad
+    @property
+    def get_atomic_first_ionization_energy(self):
+        with open("utils/first_ionization_energy.json","r") as f:
+            first_ionization_energy_table = json.loads(f.read())
+        FIE_list = [first_ionization_energy_table[Z-1] for Z in self.atomic_numbers]
+        encoded_FIE = self.Gassian_expand(FIE_list,3,25,10,2.2)
+        return encoded_FIE
+    @property
+    def get_atomic_electron_affinity(self):
+        with open("utils/electron_affinity.json","r") as f:
+            electron_affinity_table = json.loads(f.read())
+        elec_affi_list = [electron_affinity_table[Z-1] for Z in self.atomic_numbers]
+        encoded_elec_affi = self.Gassian_expand(elec_affi_list,-3,3.7,10,0.67)
+        return encoded_elec_affi
+    @property
+    def get_valence_electron_number(self):
+        patterm = re.compile(r"\d+[spdf]\d+")
+        num_atoms = self.num_atoms
+        encoded_valence_electron_number = torch.zeros((num_atoms,12),dtype=torch.float)
+        for i, atom in enumerate(self.atoms):
+            electronic_structure = atom.electronic_structure
+            valence_structure = patterm.findall(electronic_structure)
+            valence_electron_number = np.array([int(i[2:]) for i in valence_structure]).sum()
+            encoded_valence_electron_number[i,valence_electron_number-1] = 1
+        return encoded_valence_electron_number
     def encode_bond_length_with_Gaussian_distance(self, min_length: float = 0.0, max_length: float = 5.0, intervals: int = 100, expand_width: float = 0.5) -> np.ndarray:
         bond_length = self.bond_length
         centers = np.linspace(min_length, max_length, intervals)
@@ -96,7 +138,7 @@ class CrystalGraph:
                           centers[None, :])**2/expand_width**2)
         return result
     def convert_to_model_input(self) -> Dict:
-        atoms = torch.cat((self.get_atomic_groups,self.get_atomic_periods,self.get_atomic_electronegativity,self.get_atomic_covalence_redius),dim=1)
+        atoms = torch.cat((self.get_atomic_groups,self.get_atomic_periods,self.get_atomic_electronegativity,self.get_atomic_covalence_redius,self.get_atomic_first_ionization_energy,self.get_atomic_electron_affinity,self.get_atomic_blocks),dim=1)
         state = torch.FloatTensor(self.state)
         bonds = torch.FloatTensor(
             self.encode_bond_length_with_Gaussian_distance())

@@ -5,7 +5,7 @@ from torch_geometric.nn import Set2Set, MessagePassing, BatchNorm, CGConv, GINEC
 
 
 def ff(input_dim):
-    return torch.nn.Sequential(torch.nn.Linear(input_dim, 32), torch.nn.RReLU(), torch.nn.Linear(32, 16))
+    return torch.nn.Sequential(torch.nn.Linear(input_dim, 64), torch.nn.RReLU(), torch.nn.Linear(64, 32))
 
 
 def fff(input_dim):
@@ -13,7 +13,7 @@ def fff(input_dim):
 
 
 def ff_output(input_dim, output_dim):
-    return torch.nn.Sequential(torch.nn.Linear(input_dim, 128), torch.nn.RReLU(), Dropout(0.2), torch.nn.Linear(128, 64), torch.nn.RReLU(), Dropout(0.2), torch.nn.Linear(64, output_dim))
+    return torch.nn.Sequential(torch.nn.Linear(input_dim, 128), torch.nn.RReLU(), Dropout(0.1), torch.nn.Linear(128, 64), torch.nn.RReLU(), Dropout(0.1), torch.nn.Linear(64, output_dim))
 
 
 class EdgeUpdate(torch.nn.Module):
@@ -97,8 +97,8 @@ class FullMegnetBlock(torch.nn.Module):
     def __init__(self) -> None:
         super().__init__()
         self.megnetlayer = MegNetLayer()
-        self.atoms_ff = ff(16)
-        self.bonds_ff = ff(16)
+        self.atoms_ff = ff(32)
+        self.bonds_ff = ff(32)
         # self.atom_norm_cov = LayerNorm(32)
         # self.bond_norm_cov = LayerNorm(32)
         # self.atom_norm_fc = LayerNorm(32)
@@ -123,7 +123,7 @@ class FullMegnetBlock(torch.nn.Module):
 class MegNet(torch.nn.Module):
     def __init__(self, num_of_megnetblock) -> None:
         super().__init__()
-        self.atom_preblock = ff(47)
+        self.atom_preblock = ff(71)
         self.bond_preblock = ff(100)
         self.firstblock = FirstMegnetBlock()
         self.fullblocks = torch.nn.ModuleList(

@@ -9,7 +9,7 @@
     "python.testing.pytestEnabled": false,
     "python.testing.nosetestsEnabled": false,
     "python.testing.unittestEnabled": false,
-    "python.pythonPath": "/bin/python3",
+    "python.pythonPath": "/home/jlx/.conda/envs/raman/bin/python3",
     "python.autoComplete.extraPaths": [
         "/workspace/megnetorch"
     ],

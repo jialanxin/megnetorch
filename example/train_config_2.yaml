@@ -1,5 +1,5 @@
 prefix:
-  "/home/jlx/v0.4.0/4.4_atom_fea_half_embedding/"
+  "/home/jlx/v0.4.0/5.7_atom_fea/"
 model:
   num_of_megnetblock : 10
 trainer: "fit"
