@@ -27,7 +27,7 @@ def collate_fn(structure_list):
         graph, raman = structure_list[i]
         atoms, bonds, bond_atom_1, bond_atom_2, num_atoms, num_bonds = graph.atoms, graph.bonds, graph.bond_atom_1, graph.bond_atom_2, graph.num_atoms, graph.num_bonds
         if i == 0:
-            atoms_of_batch = atoms  # (num_atoms,)
+            atoms_of_batch = atoms  # (num_atoms,atom_info)
             # print("atoms_of_batch:",atoms_of_batch)
             bonds_of_batch = bonds  # (num_bonds,bond_info)
             bond_atom_1_of_batch = bond_atom_1  # (num_bonds,)
@@ -41,7 +41,7 @@ def collate_fn(structure_list):
             ramans_of_batch = raman.unsqueeze(dim=0)  # (1,raman_size)
         else:
             atoms_of_batch = torch.cat(
-                (atoms_of_batch, atoms), dim=0)  # (sum_of_num_atoms,)
+                (atoms_of_batch, atoms), dim=0)  # (sum_of_num_atoms,atom_info)
             # (sum_of_num_bonds,bond_info)
             bonds_of_batch = torch.cat((bonds_of_batch, bonds), dim=0)
             bond_atom_1 = bond_atom_1+batch_mark_for_atoms.shape[0]

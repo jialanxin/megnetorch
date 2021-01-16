@@ -131,14 +131,14 @@ except KeyError:
 trainer_config = config["trainer"]
 logger = TensorBoardLogger(prefix)
 if trainer_config == "tune":
-    trainer = pl.Trainer(gpus=1, logger=logger, callbacks=[
+    trainer = pl.Trainer(gpus=1 if torch.cuda.is_available() else 0, logger=logger, callbacks=[
                          checkpoint_callback], auto_lr_find=True)
     trainer.tune(experiment, train_dataloader, validate_dataloader)
 else:
     try: 
         path = config["checkpoint"]
-        trainer = pl.Trainer(resume_from_checkpoint=path,gpus=1, logger=logger, callbacks=[checkpoint_callback],max_epochs=2000)
+        trainer = pl.Trainer(resume_from_checkpoint=path,gpus=1 if torch.cuda.is_available() else 0, logger=logger, callbacks=[checkpoint_callback],max_epochs=2000)
     except KeyError:
-        trainer = pl.Trainer(gpus=1, logger=logger,
+        trainer = pl.Trainer(gpus=1 if torch.cuda.is_available() else 0, logger=logger,
                          callbacks=[checkpoint_callback])
     trainer.fit(experiment, train_dataloader, validate_dataloader)

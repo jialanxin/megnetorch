@@ -11,7 +11,7 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "env": {
-                "PYTHONPATH": "/home/jlx/new_megnetorch/megnetorch"
+                "PYTHONPATH": "/home/jlx/megnetorch"
             }
         }
     ]
