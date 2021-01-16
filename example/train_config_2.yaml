@@ -7,4 +7,4 @@ optimizer:
         lr: 1e-3
         type: "AdamW"
         weight_decay: 1e-2
-#checkpoint: "/home/jlx/v0.4.0/4.4_atom_fea_add_and_norm/default/version_0/checkpoints/epoch=101-step=11525.ckpt"
+checkpoint: "/home/jlx/v0.4.0/5.7_atom_fea/default/version_0/checkpoints/epoch=974-step=110174.ckpt"

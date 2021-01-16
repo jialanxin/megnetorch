@@ -9,7 +9,7 @@ def ff(input_dim):
 
 
 def fff(input_dim):
-    return torch.nn.Sequential(torch.nn.Linear(input_dim, 64), torch.nn.RReLU(), torch.nn.Linear(64, 32), torch.nn.RReLU(), torch.nn.Linear(32, 16))
+    return torch.nn.Sequential(torch.nn.Linear(input_dim, 128), torch.nn.RReLU(), torch.nn.Linear(128, 64), torch.nn.RReLU(), torch.nn.Linear(64, 32))
 
 
 def ff_output(input_dim, output_dim):
@@ -19,7 +19,7 @@ def ff_output(input_dim, output_dim):
 class EdgeUpdate(torch.nn.Module):
     def __init__(self):
         super().__init__()
-        self.phi_e = fff(48)
+        self.phi_e = fff(96)
     def forward(self, bonds, bond_atom_1, bond_atom_2, atoms):
         sum_of_num_bonds = bonds.shape[0]
         atom_info = atoms.shape[1]
@@ -43,7 +43,7 @@ class EdgeUpdate(torch.nn.Module):
 class NodeUpdate(MessagePassing):
     def __init__(self):
         super(NodeUpdate, self).__init__(aggr="mean")
-        self.phi_v = fff(32)
+        self.phi_v = fff(64)
     def forward(self, bonds, bond_atom_1, bond_atom_2, atoms):
         bond_connection = torch.cat((bond_atom_1.unsqueeze(
             dim=0), bond_atom_2.unsqueeze(dim=0)), dim=0)  # (2,sum_of_num_bonds)
@@ -130,9 +130,9 @@ class MegNet(torch.nn.Module):
             [FullMegnetBlock() for i in range(num_of_megnetblock)])
         # self.blocks = torch.nn.ModuleList(
         # [FirstMegnetBlock() for i in range(num_of_megnetblock)])
-        self.set2set_v = Set2Set(in_channels=16, processing_steps=3)
-        self.set2set_e = Set2Set(in_channels=16, processing_steps=3)
-        self.output_layer = ff_output(input_dim=64, output_dim=41)
+        self.set2set_v = Set2Set(in_channels=32, processing_steps=3)
+        self.set2set_e = Set2Set(in_channels=32, processing_steps=3)
+        self.output_layer = ff_output(input_dim=128, output_dim=41)
 
     def forward(self, atoms, bonds, bond_atom_1, bond_atom_2, batch_mark_for_atoms, batch_mark_for_bonds):
         # (sum_of_num_atoms,atom_info)
