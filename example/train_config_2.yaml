@@ -1,5 +1,5 @@
 prefix:
-  "/home/jlx/v0.4.0/5.7_atom_fea/"
+  "/home/jlx/v0.4.1/1.TransformerConv/"
 model:
   num_of_megnetblock : 10
 trainer: "fit"
@@ -7,4 +7,4 @@ optimizer:
         lr: 1e-3
         type: "AdamW"
         weight_decay: 1e-2
-checkpoint: "/home/jlx/v0.4.0/5.7_atom_fea/default/version_0/checkpoints/epoch=974-step=110174.ckpt"
+#checkpoint: "/home/jlx/v0.4.0/5.7_atom_fea/default/version_0/checkpoints/epoch=974-step=110174.ckpt"

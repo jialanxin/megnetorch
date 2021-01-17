@@ -1,19 +1,19 @@
 from os import stat
 import torch.nn
 from torch.nn import Embedding, RReLU, ReLU, Dropout
-from torch_geometric.nn import Set2Set, MessagePassing, BatchNorm, CGConv, GINEConv, GENConv, DeepGCNLayer, LayerNorm
+from torch_geometric.nn import Set2Set, MessagePassing, BatchNorm, CGConv, GINEConv, GENConv, DeepGCNLayer, LayerNorm,TransformerConv
 
 
 def ff(input_dim):
-    return torch.nn.Sequential(torch.nn.Linear(input_dim, 64), torch.nn.RReLU(), torch.nn.Linear(64, 32))
+    return torch.nn.Sequential(torch.nn.Linear(input_dim, 64), torch.nn.ReLU(), torch.nn.Linear(64, 32))
 
 
 def fff(input_dim):
-    return torch.nn.Sequential(torch.nn.Linear(input_dim, 128), torch.nn.RReLU(), torch.nn.Linear(128, 64), torch.nn.RReLU(), torch.nn.Linear(64, 32))
+    return torch.nn.Sequential(torch.nn.Linear(input_dim, 128), torch.nn.ReLU(), torch.nn.Linear(128, 64), torch.nn.ReLU(), torch.nn.Linear(64, 32))
 
 
 def ff_output(input_dim, output_dim):
-    return torch.nn.Sequential(torch.nn.Linear(input_dim, 128), torch.nn.RReLU(), Dropout(0.1), torch.nn.Linear(128, 64), torch.nn.RReLU(), Dropout(0.1), torch.nn.Linear(64, output_dim))
+    return torch.nn.Sequential(torch.nn.Linear(input_dim, 128), torch.nn.ReLU(), Dropout(0.1), torch.nn.Linear(128, 64), torch.nn.ReLU(), Dropout(0.1), torch.nn.Linear(64, output_dim))
 
 
 class EdgeUpdate(torch.nn.Module):
@@ -119,17 +119,42 @@ class FullMegnetBlock(torch.nn.Module):
         # bonds = self.bond_norm_cov(bonds,batch_mark_for_bonds)
         return atoms, bonds
 
+class EncoderBlock(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.attention_layer = TransformerConv(32,32,edge_dim=32)
+        self.atom_fc = ff(32)
+        self.edge_update = EdgeUpdate()
+        self.bond_fc = ff(32)
+    def forward(self,atoms,bonds,bond_atom_1,bond_atom_2):
+        #Node Update (Graph Transformer Convolution)
+        bond_connection = torch.cat((bond_atom_1.unsqueeze(
+            dim=0), bond_atom_2.unsqueeze(dim=0)), dim=0)
+        res_atoms = self.attention_layer(atoms,bond_connection,bonds)
+        atoms = atoms+res_atoms
+        res_atoms = self.atom_fc(atoms)
+        atoms = atoms+res_atoms
+        
+        #Edge Update (MegNet Layer Method)
+        res_bonds = self.edge_update(bonds,bond_atom_1,bond_atom_2,atoms)
+        bonds = bonds+res_bonds
+        res_bonds = self.bond_fc(bonds)
+        bonds = bonds+res_bonds
+        return atoms, bonds
+
+
+
 
 class MegNet(torch.nn.Module):
     def __init__(self, num_of_megnetblock) -> None:
         super().__init__()
         self.atom_preblock = ff(71)
         self.bond_preblock = ff(100)
-        self.firstblock = FirstMegnetBlock()
+        # self.firstblock = FirstMegnetBlock()
+        # self.fullblocks = torch.nn.ModuleList(
+        #     [FullMegnetBlock() for i in range(num_of_megnetblock)])
         self.fullblocks = torch.nn.ModuleList(
-            [FullMegnetBlock() for i in range(num_of_megnetblock)])
-        # self.blocks = torch.nn.ModuleList(
-        # [FirstMegnetBlock() for i in range(num_of_megnetblock)])
+        [EncoderBlock() for i in range(num_of_megnetblock)])
         self.set2set_v = Set2Set(in_channels=32, processing_steps=3)
         self.set2set_e = Set2Set(in_channels=32, processing_steps=3)
         self.output_layer = ff_output(input_dim=128, output_dim=41)
@@ -138,11 +163,11 @@ class MegNet(torch.nn.Module):
         # (sum_of_num_atoms,atom_info)
         atoms = self.atom_preblock(atoms)
         bonds = self.bond_preblock(bonds)  # (sum_of_num_bonds,bond_info)
-        atoms, bonds = self.firstblock(
-            bonds, bond_atom_1, bond_atom_2, atoms,batch_mark_for_atoms,batch_mark_for_bonds)
+        # atoms, bonds = self.firstblock(
+        #     bonds, bond_atom_1, bond_atom_2, atoms,batch_mark_for_atoms,batch_mark_for_bonds)
         for block in self.fullblocks:
             atoms, bonds = block(
-                bonds, bond_atom_1, bond_atom_2, atoms,batch_mark_for_atoms,batch_mark_for_bonds)
+                atoms,bonds, bond_atom_1, bond_atom_2)
         batch_size = batch_mark_for_bonds.max()+1
         # print(batch_size)
         # (batch_size,bond_info)
