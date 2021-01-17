@@ -126,14 +126,18 @@ class EncoderBlock(torch.nn.Module):
         self.atom_fc = ff(32)
         self.edge_update = EdgeUpdate()
         self.bond_fc = ff(32)
+        self.atom_norm_conv = LayerNorm(32)
+        self.atom_norm_fc = LayerNorm(32)
     def forward(self,atoms,bonds,bond_atom_1,bond_atom_2):
         #Node Update (Graph Transformer Convolution)
         bond_connection = torch.cat((bond_atom_1.unsqueeze(
             dim=0), bond_atom_2.unsqueeze(dim=0)), dim=0)
         res_atoms = self.attention_layer(atoms,bond_connection,bonds)
         atoms = atoms+res_atoms
+        atoms = self.atom_norm_conv(atoms)
         res_atoms = self.atom_fc(atoms)
         atoms = atoms+res_atoms
+        atoms = self.atom_norm_fc(atoms)
         
         #Edge Update (MegNet Layer Method)
         res_bonds = self.edge_update(bonds,bond_atom_1,bond_atom_2,atoms)
