@@ -122,8 +122,8 @@ class FullMegnetBlock(torch.nn.Module):
 class EncoderBlock(torch.nn.Module):
     def __init__(self):
         super().__init__()
-        self.attention_layer = TransformerConv(32,32,edge_dim=32,root_weight=False,heads=3)
-        self.reduce = ff(96)
+        self.attention_layer = TransformerConv(32,32,edge_dim=32,root_weight=False)
+        # self.reduce = ff(96)
         self.phi_v = fff(64)
         self.atom_fc = ff(32)
         self.edge_update = EdgeUpdate()
@@ -135,7 +135,7 @@ class EncoderBlock(torch.nn.Module):
         bond_connection = torch.cat((bond_atom_1.unsqueeze(
             dim=0), bond_atom_2.unsqueeze(dim=0)), dim=0)
         bonds_to_atoms = self.attention_layer(atoms,bond_connection,bonds)
-        bonds_to_atoms = self.reduce(bonds_to_atoms)
+        # bonds_to_atoms = self.reduce(bonds_to_atoms)
         res_atoms = torch.cat((bonds_to_atoms, atoms), dim=1)
         res_atoms = self.phi_v(res_atoms)
         atoms = atoms+res_atoms
