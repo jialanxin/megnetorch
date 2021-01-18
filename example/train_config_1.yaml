@@ -1,10 +1,10 @@
 prefix:
-  "/home/jlx/v0.4.1/1.self_attention_in_nodes/"
+  "/home/jlx/v0.4.1/5.num_40/"
 model:
-  num_of_megnetblock : 10
-trainer: "tune"
+  num_of_megnetblock : 40
+trainer: "fit"
 optimizer:
-        lr: 1e-3
+        lr: 5e-4
         type: "AdamW"
         weight_decay: 1e-2
 #checkpoint: "/home/jlx/v0.3.10/5.10_layer_original_megnet/default/version_0/checkpoints/epoch=977-step=110513.ckpt"
