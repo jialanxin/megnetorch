@@ -1,5 +1,5 @@
 prefix:
-  "/home/jlx/v0.4.1/4.self_attention_in_nodes_origin_transmformerconv/"
+  "/home/jlx/v0.4.1/4.self_attention_in_nodes_heads_3/"
 model:
   num_of_megnetblock : 10
 trainer: "fit"
