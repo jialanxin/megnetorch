@@ -23,21 +23,18 @@ with open(path_to_file, "r") as f:
 prefix = config["prefix"]
 
 
-def prepare_datesets(struct_file,raman_file):
-    with open(struct_file, "rb") as f:
-        structures = pickle.load(f)
-    with open(raman_file, "r") as f:
-        ramans = json.loads(f.read())
-    dataset = StructureRamanDataset(structures, ramans)
+def prepare_datesets(struct_raman_file):
+    with open(struct_raman_file, "r") as f:
+        struct_raman_json = json.loads(f.read())
+    dataset = StructureRamanDataset(struct_raman_json)
     return dataset
 
 
 
 
 
-train_set = prepare_datesets("./materials/JVASP/Train_Structures.pkl","./materials/JVASP/Train_ramans.json")
-validate_set = prepare_datesets("./materials/JVASP/Valid_Structures.pkl","./materials/JVASP/Valid_ramans.json")
-
+train_set = torch.load("materials/JVASP/Train_set.pt")
+validate_set = torch.load("materials/JVASP/Valid_set.pt")
 train_dataloader = DataLoader(
     dataset=train_set, batch_size=64, collate_fn=collate_fn, num_workers=4, shuffle=True)
 validate_dataloader = DataLoader(
