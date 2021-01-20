@@ -141,7 +141,7 @@ class CrystalGraph:
         atoms = torch.cat((self.get_atomic_groups,self.get_atomic_periods,self.get_atomic_electronegativity,self.get_atomic_covalence_redius,self.get_atomic_first_ionization_energy,self.get_atomic_electron_affinity,self.get_atomic_blocks),dim=1)
         state = torch.FloatTensor(self.state)
         bonds = torch.FloatTensor(
-            self.encode_bond_length_with_Gaussian_distance(max_length=2.5))
+            self.encode_bond_length_with_Gaussian_distance())
         bond_atom_1 = torch.LongTensor(self.bond_atom_1)
         bond_atom_2 = torch.LongTensor(self.bond_atom_2)
         num_atoms = self.num_atoms
