@@ -33,8 +33,8 @@ def prepare_datesets(struct_raman_file):
 
 
 
-train_set = torch.load("materials/JVASP/Train_set.pt")
-validate_set = torch.load("materials/JVASP/Valid_set.pt")
+train_set = prepare_datesets("materials/JVASP/Train_CrystalRamans.json")
+validate_set = prepare_datesets("materials/JVASP/Valid_CrystalRamans.json")
 train_dataloader = DataLoader(
     dataset=train_set, batch_size=64, collate_fn=collate_fn, num_workers=4, shuffle=True)
 validate_dataloader = DataLoader(
