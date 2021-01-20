@@ -1,10 +1,10 @@
 prefix:
-  "/home/jlx/v0.4.1/4.num_20/"
+  "/home/jlx/v0.4.1/8.another_head_3/"
 model:
-  num_of_megnetblock : 20
+  num_of_megnetblock : 10
 trainer: "fit"
 optimizer:
         lr: 1e-3
         type: "AdamW"
         weight_decay: 1e-2
-checkpoint: "/home/jlx/v0.4.1/4.num_20/default/version_0/checkpoints/epoch=926-step=104750.ckpt"
+# checkpoint: "/home/jlx/v0.4.1/4.num_20/default/version_0/checkpoints/epoch=926-step=104750.ckpt"

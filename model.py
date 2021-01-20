@@ -124,25 +124,25 @@ class EncoderBlock(torch.nn.Module):
         super().__init__()
         self.attention_layer = TransformerConv(32,32,edge_dim=32,root_weight=False,heads=3)
         # self.reduce = ff(96)
-        self.phi_v = fff(128)
+        self.phi_v = fff(96)
         self.atom_fc = ff(32)
         self.edge_update = EdgeUpdate()
         self.bond_fc = ff(32)
-        # self.atom_norm_conv = LayerNorm(32)
-        # self.atom_norm_fc = LayerNorm(32)
+        self.atom_norm_conv = LayerNorm(32)
+        self.atom_norm_fc = LayerNorm(32)
     def forward(self,bonds, bond_atom_1, bond_atom_2, atoms,batch_mark_for_atoms,batch_mark_for_bonds):
         #Node Update (Graph Transformer Convolution)
         bond_connection = torch.cat((bond_atom_1.unsqueeze(
             dim=0), bond_atom_2.unsqueeze(dim=0)), dim=0)
         bonds_to_atoms = self.attention_layer(atoms,bond_connection,bonds)
         # bonds_to_atoms = self.reduce(bonds_to_atoms)
-        res_atoms = torch.cat((bonds_to_atoms, atoms), dim=1)
-        res_atoms = self.phi_v(res_atoms)
+        # res_atoms = torch.cat((bonds_to_atoms, atoms), dim=1)
+        res_atoms = self.phi_v(bonds_to_atoms)
         atoms = atoms+res_atoms
-        # atoms = self.atom_norm_conv(atoms)
+        atoms = self.atom_norm_conv(atoms)
         res_atoms = self.atom_fc(atoms)
         atoms = atoms+res_atoms
-        # atoms = self.atom_norm_fc(atoms)
+        atoms = self.atom_norm_fc(atoms)
         
         #Edge Update (MegNet Layer Method)
         res_bonds = self.edge_update(bonds,bond_atom_1,bond_atom_2,atoms)
