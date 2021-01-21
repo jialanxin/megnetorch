@@ -1,5 +1,5 @@
 prefix:
-  "/home/jlx/v0.4.1/10.2.5A_bond_length/"
+  "/home/jlx/v0.4.2/1.transfer_source_fmt_en/"
 model:
   num_of_megnetblock : 10
 trainer: "fit"

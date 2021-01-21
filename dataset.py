@@ -56,14 +56,13 @@ class StructureFmtEnDataset(Dataset):
         couples = []
         for item in data:
             structure = Structure.from_dict(item["structure"])
-            fmt_en = item["formation_energy_per_atom"]
+            fmt_en = torch.FloatTensor([item["formation_energy_per_atom"]])
             try:
                 graph = CrystalGraph(structure)
             except RuntimeError:
                 continue
             encoded_graph = graph.convert_to_model_input()
-            encoded_fmt_en = range_encode(fmt_en,-14,5,41)
-            couples.append((encoded_graph,encoded_fmt_en))
+            couples.append((encoded_graph,fmt_en))
         return couples
     def __init__(self,data):
         super().__init__()
@@ -77,11 +76,11 @@ class StructureFmtEnDataset(Dataset):
 def prepare_datesets(json_file):
     with open(json_file, "r") as f:
         data = json.loads(f.read())
-    dataset = StructureRamanDataset(data)
+    dataset = StructureFmtEnDataset(data)
     return dataset
 
 if __name__=="__main__":
-    train_set = prepare_datesets("materials/JVASP/Train_CrystalRamans_site_exchange.json")
-    validate_set = prepare_datesets("materials/JVASP/Valid_CrystalRamans.json")
-    torch.save(train_set,"materials/JVASP/Train_set.pt")
-    torch.save(validate_set,"materials/JVASP/Valid_set.pt")
+    train_set = prepare_datesets("materials/mp/Train_data.json")
+    validate_set = prepare_datesets("materials/mp/Valid_data.json")
+    torch.save(train_set,"materials/mp/Train_set.pt")
+    torch.save(validate_set,"materials/mp/Valid_set.pt")

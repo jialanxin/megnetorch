@@ -5,11 +5,11 @@ from torch_geometric.nn import Set2Set, MessagePassing, BatchNorm, CGConv, GINEC
 
 
 def ff(input_dim):
-    return torch.nn.Sequential(torch.nn.Linear(input_dim, 128), torch.nn.ReLU(), torch.nn.Linear(128, 64))
+    return torch.nn.Sequential(torch.nn.Linear(input_dim, 64), torch.nn.ReLU(), torch.nn.Linear(64, 32))
 
 
 def fff(input_dim):
-    return torch.nn.Sequential(torch.nn.Linear(input_dim, 256), torch.nn.ReLU(), torch.nn.Linear(256, 128), torch.nn.ReLU(), torch.nn.Linear(128, 64))
+    return torch.nn.Sequential(torch.nn.Linear(input_dim, 128), torch.nn.ReLU(), torch.nn.Linear(128, 64), torch.nn.ReLU(), torch.nn.Linear(64, 32))
 
 
 def ff_output(input_dim, output_dim):
@@ -19,7 +19,7 @@ def ff_output(input_dim, output_dim):
 class EdgeUpdate(torch.nn.Module):
     def __init__(self):
         super().__init__()
-        self.phi_e = fff(192)
+        self.phi_e = fff(96)
     def forward(self, bonds, bond_atom_1, bond_atom_2, atoms):
         sum_of_num_bonds = bonds.shape[0]
         atom_info = atoms.shape[1]
@@ -105,18 +105,20 @@ class FullMegnetBlock(torch.nn.Module):
         # self.bond_norm_fc = LayerNorm(32)
 
     def forward(self, bonds, bond_atom_1, bond_atom_2, atoms,batch_mark_for_atoms,batch_mark_for_bonds):
-        res_atoms = self.atoms_ff(atoms)
-        res_bonds = self.bonds_ff(bonds)
-        atoms = atoms+res_atoms
-        bonds = bonds+res_bonds
-        # atoms = self.atom_norm_fc(atoms,batch_mark_for_atoms)
-        # bonds = self.bond_norm_fc(bonds,batch_mark_for_bonds)
         res_atoms, res_bonds = self.megnetlayer(
             bonds, bond_atom_1, bond_atom_2, atoms)
         atoms = atoms + res_atoms
         bonds = bonds + res_bonds
         # atoms = self.atom_norm_cov(atoms,batch_mark_for_atoms)
         # bonds = self.bond_norm_cov(bonds,batch_mark_for_bonds)
+
+        res_atoms = self.atoms_ff(atoms)
+        res_bonds = self.bonds_ff(bonds)
+        atoms = atoms+res_atoms
+        bonds = bonds+res_bonds
+        # atoms = self.atom_norm_fc(atoms,batch_mark_for_atoms)
+        # bonds = self.bond_norm_fc(bonds,batch_mark_for_bonds)
+
         return atoms, bonds
 
 class EncoderBlock(torch.nn.Module):
@@ -160,13 +162,13 @@ class MegNet(torch.nn.Module):
         self.atom_preblock = ff(71)
         self.bond_preblock = ff(100)
         # self.firstblock = FirstMegnetBlock()
-        # self.fullblocks = torch.nn.ModuleList(
-            # [FullMegnetBlock() for i in range(num_of_megnetblock)])
         self.fullblocks = torch.nn.ModuleList(
-        [EncoderBlock() for i in range(num_of_megnetblock)])
-        self.set2set_v = Set2Set(in_channels=64, processing_steps=3)
-        self.set2set_e = Set2Set(in_channels=64, processing_steps=3)
-        self.output_layer = ff_output(input_dim=256, output_dim=41)
+            [FullMegnetBlock() for i in range(num_of_megnetblock)])
+        # self.fullblocks = torch.nn.ModuleList(
+        # [EncoderBlock() for i in range(num_of_megnetblock)])
+        self.set2set_v = Set2Set(in_channels=32, processing_steps=3)
+        self.set2set_e = Set2Set(in_channels=32, processing_steps=3)
+        self.output_layer = ff_output(input_dim=128, output_dim=41)
 
     def forward(self, atoms, bonds, bond_atom_1, bond_atom_2, batch_mark_for_atoms, batch_mark_for_bonds):
         # (sum_of_num_atoms,atom_info)

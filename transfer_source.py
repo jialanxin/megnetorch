@@ -31,41 +31,79 @@ train_dataloader = DataLoader(
 validate_dataloader = DataLoader(
         dataset=validate_set, batch_size=64, collate_fn=collate_fn, num_workers=4)
 
-
+from model import ff,fff,FullMegnetBlock,Set2Set,ff_output
 class Experiment(pl.LightningModule):
     def __init__(self, num_conv=3, optim_type="Adam", lr=1e-3, weight_decay=0.0):
         super().__init__()
         self.save_hyperparameters()
         self.lr = lr
-        self.net = MegNet(num_of_megnetblock=self.hparams.num_conv)
-
+        self.atom_preblock = ff(71)
+        self.bond_preblock = ff(100)
+        # self.firstblock = FirstMegnetBlock()
+        self.fullblocks = torch.nn.ModuleList(
+            [FullMegnetBlock() for i in range(num_conv)])
+        # self.fullblocks = torch.nn.ModuleList(
+        # [EncoderBlock() for i in range(num_of_megnetblock)])
+        self.set2set_v = Set2Set(in_channels=32, processing_steps=3)
+        self.set2set_e = Set2Set(in_channels=32, processing_steps=3)
+        self.output_layer = ff_output(input_dim=128, output_dim=1)
+    def shared_procedure(self,atoms, bonds, bond_atom_1, bond_atom_2, batch_mark_for_atoms, batch_mark_for_bonds):
+        # (sum_of_num_atoms,atom_info)
+        atoms = self.atom_preblock(atoms)
+        # print(f"Atoms:{atoms.shape}")
+        bonds = self.bond_preblock(bonds)  # (sum_of_num_bonds,bond_info)
+        # print(f"Bonds:{bonds.shape}")
+        # atoms, bonds = self.firstblock(
+            # bonds, bond_atom_1, bond_atom_2, atoms,batch_mark_for_atoms,batch_mark_for_bonds)
+        for block in self.fullblocks:
+            atoms, bonds = block(
+                bonds, bond_atom_1, bond_atom_2, atoms,batch_mark_for_atoms,batch_mark_for_bonds)
+        # print(f"Atoms:{atoms.shape}")
+        # print(f"Bonds:{bonds.shape}")
+        batch_size = batch_mark_for_bonds.max()+1
+        # print(batch_size)
+        # (batch_size,bond_info)
+        bonds = self.set2set_e(bonds, batch=batch_mark_for_bonds)
+        atoms = self.set2set_v(atoms, batch=batch_mark_for_atoms)
+        # print(f"Atoms:{atoms.shape}")
+        # print(f"Bonds:{bonds.shape}")
+        # (batch_size, bond_info+atom_info)
+        gather_all = torch.cat((bonds, atoms), dim=1)
+        # print(f"Shape:{gather_all.shape}")
+        output_spectrum = self.output_layer(
+            gather_all)  # (batch_size, raman_info)
+        # print(f"Out:{output_spectrum.shape}")
+        return output_spectrum
     def forward(self, batch):
         atoms, bonds, bond_atom_1, bond_atom_2, _, _, batch_mark_for_atoms, batch_mark_for_bonds, _ = batch
-        predicted_spectrum = self.net(
+        predicted_spectrum = self.shared_procedure(
             atoms, bonds, bond_atom_1, bond_atom_2, batch_mark_for_atoms, batch_mark_for_bonds)
         return predicted_spectrum
 
     def training_step(self, batch, batch_idx):
         atoms, bonds, bond_atom_1, bond_atom_2, _, _, batch_mark_for_atoms, batch_mark_for_bonds, ramans_of_batch = batch
-        predicted_spectrum = self.net(
+        predicted_spectrum = self.shared_procedure(
             atoms, bonds, bond_atom_1, bond_atom_2, batch_mark_for_atoms, batch_mark_for_bonds)
+        # print(f"Pred:{predicted_spectrum.shape}")
+        # print(f"Raman:{ramans_of_batch.shape}")
         loss = F.l1_loss(predicted_spectrum, ramans_of_batch)
+        # print(f"loss:{loss}")
         self.log("train_loss", loss, on_epoch=True, on_step=False)
-        similarity = F.cosine_similarity(
-            predicted_spectrum, ramans_of_batch).mean()
-        self.log("train_simi", similarity, on_epoch=True, on_step=False)
-        return {"loss": loss, "simi": similarity}
+        # similarity = F.cosine_similarity(
+        #     predicted_spectrum, ramans_of_batch).mean()
+        # self.log("train_simi", similarity, on_epoch=True, on_step=False)
+        return loss
 
     def validation_step(self, batch, batch_idx):
         atoms, bonds, bond_atom_1, bond_atom_2, _, _, batch_mark_for_atoms, batch_mark_for_bonds, ramans_of_batch = batch
-        predicted_spectrum = self.net(
+        predicted_spectrum = self.shared_procedure(
             atoms, bonds, bond_atom_1, bond_atom_2, batch_mark_for_atoms, batch_mark_for_bonds)
         loss = F.l1_loss(predicted_spectrum, ramans_of_batch)
         self.log("val_loss", loss, on_epoch=True, on_step=False)
-        similarity = F.cosine_similarity(
-            predicted_spectrum, ramans_of_batch).mean()
-        self.log("val_simi", similarity, on_epoch=True, on_step=False)
-        return {"loss": loss, "simi": similarity}
+        # similarity = F.cosine_similarity(
+        #     predicted_spectrum, ramans_of_batch).mean()
+        # self.log("val_simi", similarity, on_epoch=True, on_step=False)
+        return loss
 
     def configure_optimizers(self):
         if self.hparams.optim_type == "AdamW":
@@ -80,9 +118,9 @@ class Experiment(pl.LightningModule):
 
 
 checkpoint_callback = ModelCheckpoint(
-    monitor='val_simi',
+    monitor='val_loss',
     save_top_k=3,
-    mode='max',
+    mode='min',
 )
 
 
@@ -112,17 +150,25 @@ def model_config(model):
     return params
 
 
-logger = TensorBoardLogger(prefix)
-model_hpparams = model_config(config)
-print(model_hpparams)
-experiment = Experiment(**model_hpparams)
+try: 
+    path = config["checkpoint"]
+    experiment = Experiment.load_from_checkpoint(path)
+except KeyError:
+    model_hpparams = model_config(config)
+    print(model_hpparams)
+    experiment = Experiment(**model_hpparams)
 
 trainer_config = config["trainer"]
+logger = TensorBoardLogger(prefix)
 if trainer_config == "tune":
-    trainer = pl.Trainer(gpus=1, logger=logger, callbacks=[
+    trainer = pl.Trainer(gpus=1 if torch.cuda.is_available() else 0, logger=logger, callbacks=[
                          checkpoint_callback], auto_lr_find=True)
     trainer.tune(experiment, train_dataloader, validate_dataloader)
 else:
-    trainer = pl.Trainer(gpus=1, logger=logger,
+    try: 
+        path = config["checkpoint"]
+        trainer = pl.Trainer(resume_from_checkpoint=path,gpus=1 if torch.cuda.is_available() else 0, logger=logger, callbacks=[checkpoint_callback],max_epochs=2000)
+    except KeyError:
+        trainer = pl.Trainer(gpus=1 if torch.cuda.is_available() else 0, logger=logger,
                          callbacks=[checkpoint_callback])
     trainer.fit(experiment, train_dataloader, validate_dataloader)
