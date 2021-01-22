@@ -72,15 +72,37 @@ class StructureFmtEnDataset(Dataset):
     def __len__(self) -> int:
         return len(self.data_info)
 
+class StructureRamanModesDataset(Dataset):
+    @staticmethod
+    def get_input(data):
+        couples = []
+        for item in data:
+            structure = Structure.from_dict(item["structure"])
+            try:
+                graph = CrystalGraph(structure)
+                raman_modes = torch.FloatTensor([graph.get_raman_mode_numbers()])
+            except RuntimeError:
+                continue
+            encoded_graph = graph.convert_to_model_input()
+            couples.append((encoded_graph,raman_modes))
+        return couples
+    def __init__(self,data):
+        super().__init__()
+        self.data_info = self.get_input(data)
+    def __getitem__(self, index: str):
+        return self.data_info[index]
+    def __len__(self) -> int:
+        return len(self.data_info)
+
 
 def prepare_datesets(json_file):
     with open(json_file, "r") as f:
         data = json.loads(f.read())
-    dataset = StructureFmtEnDataset(data)
+    dataset = StructureRamanModesDataset(data)
     return dataset
 
 if __name__=="__main__":
     train_set = prepare_datesets("materials/mp/Train_data.json")
     validate_set = prepare_datesets("materials/mp/Valid_data.json")
-    torch.save(train_set,"materials/mp/Train_set.pt")
-    torch.save(validate_set,"materials/mp/Valid_set.pt")
+    torch.save(train_set,"materials/mp/Train_raman_modes_set.pt")
+    torch.save(validate_set,"materials/mp/Valid_raman_modes_set.pt")

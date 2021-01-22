@@ -1,5 +1,5 @@
 prefix:
-  "/home/jlx/v0.4.1/11.double_embedding/"
+  "/home/jlx/v0.4.2/2.pretrain_raman_modes/"
 model:
   num_of_megnetblock : 10
 trainer: "fit"

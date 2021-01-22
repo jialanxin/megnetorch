@@ -2,6 +2,7 @@ from pymatgen import Structure
 from typing import Dict, List, Tuple
 from pymatgen import MPRester
 from pymatgen.optimization.neighbors import find_points_in_spheres
+from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 import numpy as np
 import torch
 import json
@@ -131,6 +132,24 @@ class CrystalGraph:
             valence_electron_number = np.array([int(i[2:]) for i in valence_structure]).sum()
             encoded_valence_electron_number[i,valence_electron_number-1] = 1
         return encoded_valence_electron_number
+    def get_raman_mode_numbers(self):
+        space_group_calculater = SpacegroupAnalyzer(self.structure)
+        symmetrized_structure = space_group_calculater.get_symmetrized_structure()
+        space_group = symmetrized_structure.spacegroup.int_number
+        wyckoff = symmetrized_structure.wyckoff_letters
+        wyckoff_letter, wyckoff_count = np.unique(wyckoff,return_counts=True)
+        wyckoff =  [f"{count}{letter}" for count,letter in zip(wyckoff_count,wyckoff_letter)]
+        with open("utils/raman_modes.json","r") as f:
+            raman_table = json.loads(f.read())
+        space_group_modes = []
+        for modes in raman_table:
+            if modes["SpaceGroupIndex"] == space_group:
+                space_group_modes.append(modes)
+        num_raman = 0
+        for modes in space_group_modes:
+            if modes["WP"] in wyckoff:
+                num_raman += modes["num_modes"]
+        return num_raman
     def encode_bond_length_with_Gaussian_distance(self, min_length: float = 0.0, max_length: float = 5.0, intervals: int = 100, expand_width: float = 0.5) -> np.ndarray:
         bond_length = self.bond_length
         centers = np.linspace(min_length, max_length, intervals)
