@@ -1,19 +1,16 @@
-from pytorch_lightning.loggers import TensorBoardLogger
-from torch.utils.tensorboard import SummaryWriter
-from dataset import StructureRamanDataset
-from torch.utils.data import DataLoader, random_split
-import pickle
 import json
-from model import MegNet,Set2Set
-import torch
-import time
-from dataloader import collate_fn
-import yaml
 import argparse
-import pytorch_lightning as pl
+import torch
 import torch.nn.functional as F
+import yaml
+import pytorch_lightning as pl
+from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
+from torch.utils.data import DataLoader
+from dataset import StructureRamanDataset
+from model import Set2Set
 from model import ff_output
+from dataloader import collate_fn
 from transfer_source import Experiment as Pretrain
 
 parser = argparse.ArgumentParser(description="Select a train_config.yaml file")
@@ -53,8 +50,8 @@ class Experiment(pl.LightningModule):
         self.atom_preblock = pretrain_model.atom_preblock
         self.bond_preblock = pretrain_model.bond_preblock
         self.fullblocks = pretrain_model.fullblocks
-        self.set2set_v = pretrain_model.set2set_v
-        self.set2set_e = pretrain_model.set2set_e
+        self.set2set_v = Set2Set(in_channels=32, processing_steps=3)
+        self.set2set_e = Set2Set(in_channels=32, processing_steps=3)
         self.output_layer = ff_output(input_dim=128,output_dim=41)
     def shared_procedure(self,atoms, bonds, bond_atom_1, bond_atom_2, batch_mark_for_atoms, batch_mark_for_bonds):
         # (sum_of_num_atoms,atom_info)
@@ -69,8 +66,6 @@ class Experiment(pl.LightningModule):
                 bonds, bond_atom_1, bond_atom_2, atoms,batch_mark_for_atoms,batch_mark_for_bonds)
         # print(f"Atoms:{atoms.shape}")
         # print(f"Bonds:{bonds.shape}")
-        batch_size = batch_mark_for_bonds.max()+1
-        # print(batch_size)
         # (batch_size,bond_info)
         bonds = self.set2set_e(bonds, batch=batch_mark_for_bonds)
         atoms = self.set2set_v(atoms, batch=batch_mark_for_atoms)
@@ -130,7 +125,7 @@ checkpoint_callback = ModelCheckpoint(
     mode='max',
 )
 
-def model_config(model):
+def model_config(config):
     params = {}
     try:
         num_conv = int(config["model"]["num_of_megnetblock"])
