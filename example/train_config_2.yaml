@@ -1,10 +1,10 @@
 prefix:
-  "/home/jlx/v0.4.2/3.fintune_keep_before_output_layer/"
+  "/home/jlx/v0.4.2/5.fintune_lr_1e-4/"
 model:
   num_of_megnetblock : 10
 trainer: "fit"
 optimizer:
-        lr: 1e-3
+        lr: 1e-4
         type: "AdamW"
         weight_decay: 1e-2
 # checkpoint: "/home/jlx/v0.4.1/4.num_20/default/version_0/checkpoints/epoch=926-step=104750.ckpt"
