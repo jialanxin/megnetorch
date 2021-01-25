@@ -1,4 +1,9 @@
 prefix:
-  "/home/jlx/v0.3.9/3.num_40/"
+  "/home/jlx/v0.4.2/8.finetune_lr_1e-3/"
 model:
-        num_of_megnetblock : 80
+  num_of_megnetblock : 10
+trainer: "fit"
+optimizer:
+        lr: 1e-3
+        type: "AdamW"
+        weight_decay: 1e-2
