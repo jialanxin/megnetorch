@@ -49,9 +49,9 @@ class Experiment(pl.LightningModule):
         pretrain_model.freeze()
         self.atom_preblock = pretrain_model.atom_preblock
         self.bond_preblock = pretrain_model.bond_preblock
-        self.pretrain_blocks = pretrain_model.fullblocks[:8]
+        self.pretrain_blocks = pretrain_model.fullblocks[:2]
         self.fintune_blocks = torch.nn.ModuleList(
-            [FullMegnetBlock() for i in range(3)])
+            [FullMegnetBlock() for i in range(8)])
         self.set2set_v = Set2Set(in_channels=32,processing_steps=3)
         self.set2set_e = Set2Set(in_channels=32,processing_steps=3)
         self.output_layer = ff_output(input_dim=128,output_dim=41)
