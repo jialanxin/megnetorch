@@ -49,9 +49,9 @@ class Experiment(pl.LightningModule):
         pretrain_model.freeze()
         self.atom_preblock = pretrain_model.atom_preblock
         self.bond_preblock = pretrain_model.bond_preblock
-        # self.pretrain_blocks = pretrain_model.fullblocks[:2]
+        self.pretrain_blocks = pretrain_model.fullblocks[:1]
         self.fintune_blocks = torch.nn.ModuleList(
-            [FullMegnetBlock() for i in range(10)])
+            [FullMegnetBlock() for i in range(9)])
         self.set2set_v = Set2Set(in_channels=32,processing_steps=3)
         self.set2set_e = Set2Set(in_channels=32,processing_steps=3)
         self.output_layer = ff_output(input_dim=128,output_dim=41)
@@ -63,9 +63,9 @@ class Experiment(pl.LightningModule):
         # print(f"Bonds:{bonds.shape}")
         # atoms, bonds = self.firstblock(
             # bonds, bond_atom_1, bond_atom_2, atoms,batch_mark_for_atoms,batch_mark_for_bonds)
-        # for block in self.pretrain_blocks:
-            # atoms, bonds = block(
-                # bonds, bond_atom_1, bond_atom_2, atoms,batch_mark_for_atoms,batch_mark_for_bonds)
+        for block in self.pretrain_blocks:
+            atoms, bonds = block(
+                bonds, bond_atom_1, bond_atom_2, atoms,batch_mark_for_atoms,batch_mark_for_bonds)
         for block in self.fintune_blocks:
             atoms, bonds = block(
                 bonds, bond_atom_1, bond_atom_2, atoms,batch_mark_for_atoms,batch_mark_for_bonds)
