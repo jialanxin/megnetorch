@@ -1,20 +1,16 @@
-from pytorch_lightning.loggers import TensorBoardLogger
-from torch.utils.tensorboard import SummaryWriter
-from dataset import StructureFmtEnDataset
-from torch.utils.data import DataLoader, random_split
-import pickle
 import json
-from model import MegNet
-import torch
-import time
-from dataloader import collate_fn
-import yaml
 import argparse
+import yaml
 import pytorch_lightning as pl
-import torch.nn.functional as F
+from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
+from torch.utils.data import DataLoader
+import torch
+import torch.nn.functional as F
+from dataloader import collate_fn
 
-from model import ff,fff,FullMegnetBlock,Set2Set,ff_output
+
+from model import ff,FullMegnetBlock,Set2Set,ff_output
 class Experiment(pl.LightningModule):
     def __init__(self, num_conv=3, optim_type="Adam", lr=1e-3, weight_decay=0.0):
         super().__init__()
@@ -43,7 +39,6 @@ class Experiment(pl.LightningModule):
                 bonds, bond_atom_1, bond_atom_2, atoms,batch_mark_for_atoms,batch_mark_for_bonds)
         # print(f"Atoms:{atoms.shape}")
         # print(f"Bonds:{bonds.shape}")
-        batch_size = batch_mark_for_bonds.max()+1
         # print(batch_size)
         # (batch_size,bond_info)
         bonds = self.set2set_e(bonds, batch=batch_mark_for_bonds)
