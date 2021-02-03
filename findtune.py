@@ -45,7 +45,7 @@ class Experiment(pl.LightningModule):
         super().__init__()
         self.save_hyperparameters()
         self.lr = lr
-        pretrain_model = Pretrain.load_from_checkpoint("/home/jlx/v0.4.2/1.transfer_source_fmt_en/default/version_0/checkpoints/epoch=961-step=1469935.ckpt")
+        pretrain_model = Pretrain.load_from_checkpoint("pretrain/epoch=961-step=1469935.ckpt")
         pretrain_model.freeze()
         self.atom_preblock = pretrain_model.atom_preblock
         self.bond_preblock = pretrain_model.bond_preblock
@@ -54,7 +54,7 @@ class Experiment(pl.LightningModule):
             [FullMegnetBlock() for i in range(9)])
         self.set2set_v = Set2Set(in_channels=32,processing_steps=3)
         self.set2set_e = Set2Set(in_channels=32,processing_steps=3)
-        self.output_layer = ff_output(input_dim=128,output_dim=41)
+        self.output_layer = ff_output(input_dim=128,output_dim=25)
     def shared_procedure(self,atoms, bonds, bond_atom_1, bond_atom_2, batch_mark_for_atoms, batch_mark_for_bonds):
         # (sum_of_num_atoms,atom_info)
         atoms = self.atom_preblock(atoms)

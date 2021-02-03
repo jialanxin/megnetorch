@@ -6,3 +6,5 @@ checkpoint*
 runs/
 materials/mp/
 materials/JVASP/
+pretrain/
+logs/
