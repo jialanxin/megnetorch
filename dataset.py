@@ -1,4 +1,4 @@
-from utils.graph import CrystalGraph,range_encode
+from utils.graph import CrystalGraph,range_encode,CrystalEmbedding
 from torch.utils.data import Dataset
 import torch
 import json
@@ -58,8 +58,8 @@ class StructureFmtEnDataset(Dataset):
             structure = Structure.from_dict(item["structure"])
             fmt_en = torch.FloatTensor([item["formation_energy_per_atom"]])
             try:
-                graph = CrystalGraph(structure)
-            except RuntimeError:
+                graph = CrystalEmbedding(structure)
+            except ValueError:
                 continue
             encoded_graph = graph.convert_to_model_input()
             couples.append((encoded_graph,fmt_en))
@@ -98,7 +98,7 @@ class StructureRamanModesDataset(Dataset):
 def prepare_datesets(json_file):
     with open(json_file, "r") as f:
         data = json.loads(f.read())
-    dataset = StructureRamanModesDataset(data)
+    dataset = StructureFmtEnDataset(data)
     return dataset
 
 if __name__=="__main__":

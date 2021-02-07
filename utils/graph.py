@@ -168,3 +168,47 @@ class CrystalGraph:
         input = EncodedGraph(atoms, bonds, bond_atom_1,
                              bond_atom_2, num_atoms, num_bonds)
         return input
+
+
+
+class CrystalEmbedding(CrystalGraph):
+    def __init__(self, structure,max_atoms=150):
+        super().__init__(structure)
+        self.max_atoms = max_atoms
+        if self.num_atoms > self.max_atoms:
+            raise ValueError(f"Crystal exceeds max_atoms({self.max_atoms})")
+    
+    @property
+    def padding(self):
+        has_atoms = torch.zeros((self.num_atoms,))
+        not_atoms = torch.ones((self.max_atoms-self.num_atoms,))
+        padding = torch.cat((has_atoms,not_atoms)).bool()
+        return padding
+
+    @property
+    def positions(self):
+        sites = self.structure.sites
+        for (i,site) in enumerate(sites):
+            x = site.x
+            y = site.y
+            z = site.z
+            position = torch.FloatTensor([[x,y,z]])
+            if i == 0:
+                positions = position
+            else:
+                positions = torch.cat((positions,position),dim=0)
+        return positions
+    def convert_to_model_input(self) -> Dict:
+        atoms_fea = torch.cat((self.get_atomic_groups,self.get_atomic_periods,self.get_atomic_electronegativity,self.get_atomic_covalence_redius,self.get_atomic_first_ionization_energy,self.get_atomic_electron_affinity,self.get_atomic_blocks),dim=1)
+        embedding_dim = atoms_fea.shape[1]
+        atoms_padding = torch.zeros((self.max_atoms-self.num_atoms,embedding_dim))
+        atoms_padded = torch.cat((atoms_fea,atoms_padding),dim=0)
+
+        positions_dim = self.positions.shape[1]
+        positions_padding = torch.zeros((self.max_atoms-self.num_atoms,positions_dim))
+        positions_padded = torch.cat((self.positions,positions_padding),dim=0)
+
+        lattice = torch.FloatTensor(self.structure.lattice.matrix)
+        lattice = torch.flatten(lattice)
+
+        return {"atoms":atoms_padded,"positions":positions_padded,"padding_mask":self.padding,"lattice":lattice}
