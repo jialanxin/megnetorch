@@ -56,10 +56,14 @@ class StructureFmtEnDataset(Dataset):
         couples = []
         for item in data:
             structure = Structure.from_dict(item["structure"])
-            fmt_en = torch.FloatTensor([item["formation_energy_per_atom"]])
             try:
+                fmt_en = torch.FloatTensor([item["formation_energy_per_atom"]])
                 graph = CrystalEmbedding(structure)
             except ValueError:
+                continue
+            except RuntimeError:
+                continue
+            except TypeError:
                 continue
             encoded_graph = graph.convert_to_model_input()
             couples.append((encoded_graph,fmt_en))
@@ -104,5 +108,7 @@ def prepare_datesets(json_file):
 if __name__=="__main__":
     train_set = prepare_datesets("materials/mp/Train_data.json")
     validate_set = prepare_datesets("materials/mp/Valid_data.json")
-    torch.save(train_set,"materials/mp/Train_raman_modes_set.pt")
-    torch.save(validate_set,"materials/mp/Valid_raman_modes_set.pt")
+    print(len(train_set))
+    print(len(validate_set))
+    torch.save(train_set,"materials/mp/Train_fmten_set.pt")
+    torch.save(validate_set,"materials/mp/Valid_fmten_set.pt")

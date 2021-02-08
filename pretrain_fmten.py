@@ -8,63 +8,80 @@ from torch.utils.data import DataLoader
 import torch
 import torch.nn.functional as F
 from dataloader import collate_fn
+from dataset import StructureFmtEnDataset
+from torch.nn import Embedding, RReLU, ReLU, Dropout
 
 
-from model import ff,FullMegnetBlock,Set2Set,ff_output
+def ff(input_dim):
+    return torch.nn.Sequential(torch.nn.Linear(input_dim, 64), torch.nn.ReLU(), torch.nn.Linear(64, 32))
+
+
+def ff_output(input_dim, output_dim):
+    return torch.nn.Sequential(torch.nn.Linear(input_dim, 128), torch.nn.RReLU(), Dropout(0.1), torch.nn.Linear(128, 64), torch.nn.RReLU(), Dropout(0.1), torch.nn.Linear(64, output_dim))
+
+
 class Experiment(pl.LightningModule):
-    def __init__(self, num_conv=3, optim_type="Adam", lr=1e-3, weight_decay=0.0):
+    def __init__(self, num_enc=6, optim_type="Adam", lr=1e-3, weight_decay=0.0):
         super().__init__()
         self.save_hyperparameters()
         self.lr = lr
-        self.atom_preblock = ff(71)
-        self.bond_preblock = ff(100)
-        # self.firstblock = FirstMegnetBlock()
-        self.fullblocks = torch.nn.ModuleList(
-            [FullMegnetBlock() for i in range(num_conv)])
-        # self.fullblocks = torch.nn.ModuleList(
-        # [EncoderBlock() for i in range(num_of_megnetblock)])
-        self.set2set_v = Set2Set(in_channels=32, processing_steps=3)
-        self.set2set_e = Set2Set(in_channels=32, processing_steps=3)
-        self.output_layer = ff_output(input_dim=128, output_dim=1)
-    def shared_procedure(self,atoms, bonds, bond_atom_1, bond_atom_2, batch_mark_for_atoms, batch_mark_for_bonds):
-        # (sum_of_num_atoms,atom_info)
-        atoms = self.atom_preblock(atoms)
-        # print(f"Atoms:{atoms.shape}")
-        bonds = self.bond_preblock(bonds)  # (sum_of_num_bonds,bond_info)
-        # print(f"Bonds:{bonds.shape}")
-        # atoms, bonds = self.firstblock(
-            # bonds, bond_atom_1, bond_atom_2, atoms,batch_mark_for_atoms,batch_mark_for_bonds)
-        for block in self.fullblocks:
-            atoms, bonds = block(
-                bonds, bond_atom_1, bond_atom_2, atoms,batch_mark_for_atoms,batch_mark_for_bonds)
-        # print(f"Atoms:{atoms.shape}")
-        # print(f"Bonds:{bonds.shape}")
-        # print(batch_size)
-        # (batch_size,bond_info)
-        bonds = self.set2set_e(bonds, batch=batch_mark_for_bonds)
-        atoms = self.set2set_v(atoms, batch=batch_mark_for_atoms)
-        # print(f"Atoms:{atoms.shape}")
-        # print(f"Bonds:{bonds.shape}")
-        # (batch_size, bond_info+atom_info)
-        gather_all = torch.cat((bonds, atoms), dim=1)
-        # print(f"Shape:{gather_all.shape}")
-        output_spectrum = self.output_layer(
-            gather_all)  # (batch_size, raman_info)
-        # print(f"Out:{output_spectrum.shape}")
+        self.atom_embedding = ff(71)
+        self.position_embedding = ff(3)
+        self.lattice_embedding = ff(9)
+        encode_layer = torch.nn.TransformerEncoderLayer(
+            d_model=32, nhead=4, dim_feedforward=128)
+        self.encoder = torch.nn.TransformerEncoder(
+            encode_layer, num_layers=num_enc)
+        self.readout = ff_output(input_dim=32, output_dim=1)
+
+    def shared_procedure(self, atoms, positions, padding_mask, lattice):
+        # atoms: (batch_size,max_atoms,atoms_info)
+        # positions: (batch_size, max_atoms, position_info)
+        # padding_mask: (batch_size, max_atoms)
+        # lattice: (batchsize, lattice_info)
+        atoms = self.atom_embedding(atoms)  # (batch_size,max_atoms,atoms_info)
+        # (batch_size,max_atoms,positions_info)
+        positions = self.position_embedding(positions)
+        atoms = atoms+positions  # (batch_size,max_atoms,atoms_info)
+        lattice = self.lattice_embedding(lattice)  # (batch_size,lacttice_info)
+        # (batch_size,1,lacttice_info)
+        lattice = torch.unsqueeze(lattice, dim=1)
+        # (batch_size,1+max_atoms,atoms_info)
+        atoms = torch.cat((lattice, atoms), dim=1)
+        # (1+max_atoms, batch_size, atoms_info)
+        atoms = torch.transpose(atoms, dim0=0, dim1=1)
+        cls_padding = torch.zeros((64, 1)).bool()  # (batch_size, 1)
+        # (batch_size, 1+max_atoms)
+        padding_mask = torch.cat((cls_padding, padding_mask), dim=1)
+
+        # (1+max_atoms, batch_size, atoms_info)
+        atoms = self.encoder(src=atoms, src_key_padding_mask=padding_mask)
+
+        system_out = atoms[0]  # (batch_size,atoms_info)
+
+        output_spectrum = self.readout(system_out)  # (batch_size, raman_info)
+
         return output_spectrum
+
     def forward(self, batch):
-        atoms, bonds, bond_atom_1, bond_atom_2, _, _, batch_mark_for_atoms, batch_mark_for_bonds, _ = batch
+        encoded_graph, _ = batch
+        atoms = encoded_graph["atoms"]
+        positions = encoded_graph["positions"]
+        padding_mask = encoded_graph["padding_mask"]
+        lattice = encoded_graph["lattice"]
         predicted_spectrum = self.shared_procedure(
-            atoms, bonds, bond_atom_1, bond_atom_2, batch_mark_for_atoms, batch_mark_for_bonds)
+            atoms, positions, padding_mask, lattice)
         return predicted_spectrum
 
     def training_step(self, batch, batch_idx):
-        atoms, bonds, bond_atom_1, bond_atom_2, _, _, batch_mark_for_atoms, batch_mark_for_bonds, ramans_of_batch = batch
+        encoded_graph, ramans = batch
+        atoms = encoded_graph["atoms"]
+        positions = encoded_graph["positions"]
+        padding_mask = encoded_graph["padding_mask"]
+        lattice = encoded_graph["lattice"]
         predicted_spectrum = self.shared_procedure(
-            atoms, bonds, bond_atom_1, bond_atom_2, batch_mark_for_atoms, batch_mark_for_bonds)
-        # print(f"Pred:{predicted_spectrum.shape}")
-        # print(f"Raman:{ramans_of_batch.shape}")
-        loss = F.l1_loss(predicted_spectrum, ramans_of_batch)
+            atoms, positions, padding_mask, lattice)
+        loss = F.l1_loss(predicted_spectrum, ramans)
         # print(f"loss:{loss}")
         self.log("train_loss", loss, on_epoch=True, on_step=False)
         # similarity = F.cosine_similarity(
@@ -73,10 +90,14 @@ class Experiment(pl.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        atoms, bonds, bond_atom_1, bond_atom_2, _, _, batch_mark_for_atoms, batch_mark_for_bonds, ramans_of_batch = batch
+        encoded_graph, ramans = batch
+        atoms = encoded_graph["atoms"]
+        positions = encoded_graph["positions"]
+        padding_mask = encoded_graph["padding_mask"]
+        lattice = encoded_graph["lattice"]
         predicted_spectrum = self.shared_procedure(
-            atoms, bonds, bond_atom_1, bond_atom_2, batch_mark_for_atoms, batch_mark_for_bonds)
-        loss = F.l1_loss(predicted_spectrum, ramans_of_batch)
+            atoms, positions, padding_mask, lattice)
+        loss = F.l1_loss(predicted_spectrum, ramans)
         self.log("val_loss", loss, on_epoch=True, on_step=False)
         # similarity = F.cosine_similarity(
         #     predicted_spectrum, ramans_of_batch).mean()
@@ -95,15 +116,11 @@ class Experiment(pl.LightningModule):
         return [optimizer], [schedualer]
 
 
-
-
-
-
 def model_config(model):
     params = {}
     try:
-        num_conv = int(config["model"]["num_of_megnetblock"])
-        params["num_conv"] = num_conv
+        num_enc = int(config["model"]["num_of_encoder"])
+        params["num_conv"] = num_enc
     except:
         pass
     try:
@@ -125,11 +142,9 @@ def model_config(model):
     return params
 
 
-
-
-
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Select a train_config.yaml file")
+    parser = argparse.ArgumentParser(
+        description="Select a train_config.yaml file")
     parser.add_argument(dest="filename", metavar="/path/to/file")
     arg = parser.parse_args()
     path_to_file = arg.filename
@@ -137,23 +152,20 @@ if __name__ == "__main__":
         config = yaml.load(f.read(), Loader=yaml.BaseLoader)
     prefix = config["prefix"]
 
-
-    train_set = torch.load("./materials/mp/Train_set.pt")
-    validate_set = torch.load("./materials/mp/Valid_set.pt")
+    train_set = torch.load("./materials/mp/Train_fmten_set.pt")
+    validate_set = torch.load("./materials/mp/Valid_fmten_set.pt")
 
     train_dataloader = DataLoader(
-            dataset=train_set, batch_size=64, collate_fn=collate_fn, num_workers=4)
+        dataset=train_set, batch_size=64, num_workers=4)
     validate_dataloader = DataLoader(
-            dataset=validate_set, batch_size=64, collate_fn=collate_fn, num_workers=4)
-
-
+        dataset=validate_set, batch_size=64, num_workers=4)
 
     checkpoint_callback = ModelCheckpoint(
         monitor='val_loss',
         save_top_k=3,
         mode='min',
     )
-    try: 
+    try:
         path = config["checkpoint"]
         experiment = Experiment.load_from_checkpoint(path)
     except KeyError:
@@ -165,13 +177,14 @@ if __name__ == "__main__":
     logger = TensorBoardLogger(prefix)
     if trainer_config == "tune":
         trainer = pl.Trainer(gpus=1 if torch.cuda.is_available() else 0, logger=logger, callbacks=[
-                            checkpoint_callback], auto_lr_find=True)
+            checkpoint_callback], auto_lr_find=True)
         trainer.tune(experiment, train_dataloader, validate_dataloader)
     else:
-        try: 
+        try:
             path = config["checkpoint"]
-            trainer = pl.Trainer(resume_from_checkpoint=path,gpus=1 if torch.cuda.is_available() else 0, logger=logger, callbacks=[checkpoint_callback],max_epochs=2000)
+            trainer = pl.Trainer(resume_from_checkpoint=path, gpus=1 if torch.cuda.is_available(
+            ) else 0, logger=logger, callbacks=[checkpoint_callback], max_epochs=2000)
         except KeyError:
             trainer = pl.Trainer(gpus=1 if torch.cuda.is_available() else 0, logger=logger,
-                            callbacks=[checkpoint_callback])
+                                 callbacks=[checkpoint_callback])
         trainer.fit(experiment, train_dataloader, validate_dataloader)

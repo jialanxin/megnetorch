@@ -1,7 +1,5 @@
 prefix:
-  "gdrive/MyDrive/Raman_machine_learning/models/v0.4.3/0.fintune_keep_before_block_1/"
-model:
-  num_of_megnetblock : 10
+  "gdrive/MyDrive/Raman_machine_learning/models/v0.4.3/1.pretrain_fmt_en/"
 trainer: "fit"
 optimizer:
         lr: 1e-3
