@@ -1,8 +1,7 @@
 prefix:
-  "gdrive/MyDrive/Raman_machine_learning/models/v0.4.3/1.pretrain_fmt_en/"
+  "gdrive/MyDrive/Raman_machine_learning/models/v0.4.3/2.pretrain_fmt_en_no_weight_decay/"
 trainer: "fit"
 optimizer:
         lr: 1e-3
-        type: "AdamW"
-        weight_decay: 1e-2
+        type: "Adam"
 # checkpoint: "/home/jlx/v0.4.1/4.num_20/default/version_0/checkpoints/epoch=926-step=104750.ckpt"

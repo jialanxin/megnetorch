@@ -50,7 +50,9 @@ class Experiment(pl.LightningModule):
         atoms = torch.cat((lattice, atoms), dim=1)
         # (1+max_atoms, batch_size, atoms_info)
         atoms = torch.transpose(atoms, dim0=0, dim1=1)
-        cls_padding = torch.zeros((64, 1)).bool()  # (batch_size, 1)
+        batch_size = padding_mask.shape[0]
+        cls_padding = torch.zeros((batch_size, 1)).bool().to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))  # (batch_size, 1)
+
         # (batch_size, 1+max_atoms)
         padding_mask = torch.cat((cls_padding, padding_mask), dim=1)
 
