@@ -185,7 +185,7 @@ if __name__ == "__main__":
         try:
             path = config["checkpoint"]
             trainer = pl.Trainer(resume_from_checkpoint=path, gpus=1 if torch.cuda.is_available(
-            ) else 0, logger=logger, callbacks=[checkpoint_callback], max_epochs=2000)
+            ) else 0, logger=logger, callbacks=[checkpoint_callback], max_epochs=1000)
         except KeyError:
             trainer = pl.Trainer(gpus=1 if torch.cuda.is_available() else 0, logger=logger,
                                  callbacks=[checkpoint_callback])

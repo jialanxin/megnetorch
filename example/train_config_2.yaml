@@ -1,7 +1,7 @@
 prefix:
   "gdrive/MyDrive/Raman_machine_learning/models/v0.4.3/3.pretrain_fmt_en_embedded/"
-trainer: "tune"
+trainer: "fit"
 optimizer:
         lr: 1e-3
         type: "Adam"
-# checkpoint: "/home/jlx/v0.4.1/4.num_20/default/version_0/checkpoints/epoch=926-step=104750.ckpt"
+checkpoint: "gdrive/MyDrive/Raman_machine_learning/models/v0.4.3/3.pretrain_fmt_en_embedded/default/version_0/checkpoints/epoch=65-step=99989.ckpt"
