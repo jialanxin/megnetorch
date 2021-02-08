@@ -192,11 +192,14 @@ class CrystalEmbedding(CrystalGraph):
             x = site.x
             y = site.y
             z = site.z
-            position = torch.FloatTensor([[x,y,z]])
+            position = torch.FloatTensor([x,y,z])
+            position = torch.log(position+1)
+            position = self.Gassian_expand(position,min_value=0,max_value=6,intervals=10,expand_width=0.5) #(3,position_info) (3,10)
+            position = torch.reshape(position,(1,-1)) # (1, position_info) (1, 30)
             if i == 0:
                 positions = position
             else:
-                positions = torch.cat((positions,position),dim=0)
+                positions = torch.cat((positions,position),dim=0) # (num_atoms, position_info) (num_atoms, 30)
         return positions
     def convert_to_model_input(self) -> Dict:
         atoms_fea = torch.cat((self.get_atomic_groups,self.get_atomic_periods,self.get_atomic_electronegativity,self.get_atomic_covalence_redius,self.get_atomic_first_ionization_energy,self.get_atomic_electron_affinity,self.get_atomic_blocks),dim=1)
@@ -210,5 +213,8 @@ class CrystalEmbedding(CrystalGraph):
 
         lattice = torch.FloatTensor(self.structure.lattice.matrix)
         lattice = torch.flatten(lattice)
-
+        lattice = torch.log(lattice+1)
+        lattice = self.Gassian_expand(lattice,min_value=0,max_value=6,intervals=10,expand_width=0.5)  #(9,lattice_info)
+        lattice = torch.flatten(lattice) #(90,)
+ 
         return {"atoms":atoms_padded,"positions":positions_padded,"padding_mask":self.padding,"lattice":lattice}

@@ -26,8 +26,8 @@ class Experiment(pl.LightningModule):
         self.save_hyperparameters()
         self.lr = lr
         self.atom_embedding = ff(71)
-        self.position_embedding = ff(3)
-        self.lattice_embedding = ff(9)
+        self.position_embedding = ff(30)
+        self.lattice_embedding = ff(90)
         encode_layer = torch.nn.TransformerEncoderLayer(
             d_model=32, nhead=4, dim_feedforward=128)
         self.encoder = torch.nn.TransformerEncoder(
@@ -154,8 +154,8 @@ if __name__ == "__main__":
         config = yaml.load(f.read(), Loader=yaml.BaseLoader)
     prefix = config["prefix"]
 
-    train_set = torch.load("./materials/mp/Train_fmten_set.pt")
-    validate_set = torch.load("./materials/mp/Valid_fmten_set.pt")
+    train_set = torch.load("./materials/mp/Train_fmten_emd_set.pt")
+    validate_set = torch.load("./materials/mp/Valid_fmten_emd_set.pt")
 
     train_dataloader = DataLoader(
         dataset=train_set, batch_size=64, num_workers=4)
