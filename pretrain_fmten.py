@@ -29,7 +29,7 @@ class Experiment(pl.LightningModule):
         self.position_embedding = ff(30)
         self.lattice_embedding = ff(90)
         encode_layer = torch.nn.TransformerEncoderLayer(
-            d_model=32, nhead=4, dim_feedforward=128)
+            d_model=32, nhead=8, dim_feedforward=128)
         self.encoder = torch.nn.TransformerEncoder(
             encode_layer, num_layers=num_enc)
         self.readout = ff_output(input_dim=32, output_dim=1)
