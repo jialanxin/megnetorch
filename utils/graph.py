@@ -193,7 +193,7 @@ class CrystalEmbedding(CrystalGraph):
             y = site.y
             z = site.z
             position = torch.FloatTensor([x,y,z])
-            position = torch.log(position+1)
+            position = torch.asinh(position)
             position = self.Gassian_expand(position,min_value=0,max_value=6,intervals=10,expand_width=0.5) #(3,position_info) (3,10)
             position = torch.reshape(position,(1,-1)) # (1, position_info) (1, 30)
             if i == 0:
@@ -213,8 +213,8 @@ class CrystalEmbedding(CrystalGraph):
 
         lattice = torch.FloatTensor(self.structure.lattice.matrix)
         lattice = torch.flatten(lattice)
-        lattice = torch.log(lattice+1)
-        lattice = self.Gassian_expand(lattice,min_value=0,max_value=6,intervals=10,expand_width=0.5)  #(9,lattice_info)
+        lattice = torch.asinh(lattice)
+        lattice = self.Gassian_expand(lattice,min_value=-6,max_value=6,intervals=10,expand_width=0.5)  #(9,lattice_info)
         lattice = torch.flatten(lattice) #(90,)
  
         return {"atoms":atoms_padded,"positions":positions_padded,"padding_mask":self.padding,"lattice":lattice}
