@@ -21,7 +21,7 @@ def ff_output(input_dim, output_dim):
 
 
 class Experiment(pl.LightningModule):
-    def __init__(self, num_enc=6, optim_type="Adam", lr=1e-3, weight_decay=0.0):
+    def __init__(self, num_enc=12, optim_type="Adam", lr=1e-3, weight_decay=0.0):
         super().__init__()
         self.save_hyperparameters()
         self.lr = lr
