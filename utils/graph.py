@@ -98,28 +98,28 @@ class CrystalGraph:
                 meet_nan = True
             else:
                 electronegativity.append(atom.X)
-        encoded_electronegativity = self.Gassian_expand(electronegativity,0.5,4.0,10,0.35)
+        encoded_electronegativity = self.Gassian_expand(electronegativity,0.5,4.0,20,0.18)
         return encoded_electronegativity
     @property
     def get_atomic_covalence_redius(self):
         with open("utils/covalence_radius.json","r") as f:
             covalence_radius_table = json.loads(f.read())
         cov_rad_list = [covalence_radius_table[Z-1] for Z in self.atomic_numbers]
-        encoded_cov_rad = self.Gassian_expand(cov_rad_list,50,250,10,20)
+        encoded_cov_rad = self.Gassian_expand(cov_rad_list,50,250,20,10)
         return encoded_cov_rad
     @property
     def get_atomic_first_ionization_energy(self):
         with open("utils/first_ionization_energy.json","r") as f:
             first_ionization_energy_table = json.loads(f.read())
         FIE_list = [first_ionization_energy_table[Z-1] for Z in self.atomic_numbers]
-        encoded_FIE = self.Gassian_expand(FIE_list,3,25,10,2.2)
+        encoded_FIE = self.Gassian_expand(FIE_list,3,25,20,1.1)
         return encoded_FIE
     @property
     def get_atomic_electron_affinity(self):
         with open("utils/electron_affinity.json","r") as f:
             electron_affinity_table = json.loads(f.read())
         elec_affi_list = [electron_affinity_table[Z-1] for Z in self.atomic_numbers]
-        encoded_elec_affi = self.Gassian_expand(elec_affi_list,-3,3.7,10,0.67)
+        encoded_elec_affi = self.Gassian_expand(elec_affi_list,-3,3.7,20,0.33)
         return encoded_elec_affi
     @property
     def get_valence_electron_number(self):
@@ -194,15 +194,15 @@ class CrystalEmbedding(CrystalGraph):
             z = site.z
             position = torch.FloatTensor([x,y,z])
             position = torch.asinh(position)
-            position = self.Gassian_expand(position,min_value=0,max_value=6,intervals=10,expand_width=0.5) #(3,position_info) (3,10)
-            position = torch.reshape(position,(1,-1)) # (1, position_info) (1, 30)
+            position = self.Gassian_expand(position,min_value=-3,max_value=6,intervals=20,expand_width=0.45) #(3,position_info) (3,20)
+            position = torch.reshape(position,(1,-1)) # (1, position_info) (1, 60)
             if i == 0:
                 positions = position
             else:
-                positions = torch.cat((positions,position),dim=0) # (num_atoms, position_info) (num_atoms, 30)
+                positions = torch.cat((positions,position),dim=0) # (num_atoms, position_info) (num_atoms, 60)
         return positions
     def convert_to_model_input(self) -> Dict:
-        atoms_fea = torch.cat((self.get_atomic_groups,self.get_atomic_periods,self.get_atomic_electronegativity,self.get_atomic_covalence_redius,self.get_atomic_first_ionization_energy,self.get_atomic_electron_affinity,self.get_atomic_blocks),dim=1)
+        atoms_fea = torch.cat((self.get_atomic_groups,self.get_atomic_periods,self.get_atomic_electronegativity,self.get_atomic_covalence_redius,self.get_atomic_first_ionization_energy,self.get_atomic_electron_affinity,self.get_atomic_blocks),dim=1) #(num_atoms, 111)
         embedding_dim = atoms_fea.shape[1]
         atoms_padding = torch.zeros((self.max_atoms-self.num_atoms,embedding_dim))
         atoms_padded = torch.cat((atoms_fea,atoms_padding),dim=0)
@@ -214,7 +214,7 @@ class CrystalEmbedding(CrystalGraph):
         lattice = torch.FloatTensor(self.structure.lattice.matrix)
         lattice = torch.flatten(lattice)
         lattice = torch.asinh(lattice)
-        lattice = self.Gassian_expand(lattice,min_value=-6,max_value=6,intervals=10,expand_width=0.5)  #(9,lattice_info)
-        lattice = torch.flatten(lattice) #(90,)
+        lattice = self.Gassian_expand(lattice,min_value=-3,max_value=6,intervals=20,expand_width=0.45)  #(9,lattice_info)
+        lattice = torch.flatten(lattice) #(180,)
  
         return {"atoms":atoms_padded,"positions":positions_padded,"padding_mask":self.padding,"lattice":lattice}
