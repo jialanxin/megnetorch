@@ -13,7 +13,7 @@ from torch.nn import Embedding, RReLU, ReLU, Dropout
 
 
 def ff(input_dim):
-    return torch.nn.Sequential(torch.nn.Linear(input_dim, 32))
+    return torch.nn.Sequential(torch.nn.Linear(input_dim, 64))
 
 
 def ff_output(input_dim, output_dim):
@@ -25,14 +25,14 @@ class Experiment(pl.LightningModule):
         super().__init__()
         self.save_hyperparameters()
         self.lr = lr
-        self.atom_embedding = ff(71)
-        self.position_embedding = ff(30)
-        self.lattice_embedding = ff(90)
+        self.atom_embedding = ff(111)
+        self.position_embedding = ff(60)
+        self.lattice_embedding = ff(180)
         encode_layer = torch.nn.TransformerEncoderLayer(
-            d_model=32, nhead=8, dim_feedforward=128)
+            d_model=64, nhead=8, dim_feedforward=256)
         self.encoder = torch.nn.TransformerEncoder(
             encode_layer, num_layers=num_enc)
-        self.readout = ff_output(input_dim=32, output_dim=1)
+        self.readout = ff_output(input_dim=64, output_dim=1)
 
     def shared_procedure(self, atoms, positions, padding_mask, lattice):
         # atoms: (batch_size,max_atoms,atoms_info)
@@ -51,7 +51,8 @@ class Experiment(pl.LightningModule):
         # (1+max_atoms, batch_size, atoms_info)
         atoms = torch.transpose(atoms, dim0=0, dim1=1)
         batch_size = padding_mask.shape[0]
-        cls_padding = torch.zeros((batch_size, 1)).bool().to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))  # (batch_size, 1)
+        cls_padding = torch.zeros((batch_size, 1)).bool().to(torch.device(
+            "cuda" if torch.cuda.is_available() else "cpu"))  # (batch_size, 1)
 
         # (batch_size, 1+max_atoms)
         padding_mask = torch.cat((cls_padding, padding_mask), dim=1)
@@ -113,9 +114,12 @@ class Experiment(pl.LightningModule):
         else:
             optimizer = torch.optim.Adam(
                 self.parameters(), lr=self.lr, weight_decay=self.hparams.weight_decay)
-        schedualer = torch.optim.lr_scheduler.CosineAnnealingLR(
-            optimizer, T_max=64)
-        return [optimizer], [schedualer]
+        schedualer = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer)
+        return {
+            'optimizer': optimizer,
+            'lr_scheduler': schedualer,
+            'monitor': 'val_loss'
+        }
 
 
 def model_config(model):
@@ -154,8 +158,8 @@ if __name__ == "__main__":
         config = yaml.load(f.read(), Loader=yaml.BaseLoader)
     prefix = config["prefix"]
 
-    train_set = torch.load("./materials/mp/Train_fmten_emd_set.pt")
-    validate_set = torch.load("./materials/mp/Valid_fmten_emd_set.pt")
+    train_set = torch.load("./materials/mp/Train_fmten_emdx2_set.pt")
+    validate_set = torch.load("./materials/mp/Valid_fmten_emdx2_set.pt")
 
     train_dataloader = DataLoader(
         dataset=train_set, batch_size=64, num_workers=4)

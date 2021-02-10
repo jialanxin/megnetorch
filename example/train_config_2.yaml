@@ -1,7 +1,7 @@
 prefix:
-  "gdrive/MyDrive/Raman_machine_learning/models/v0.4.3/6.pretrain_fmten_direct_embedding/"
+  "gdrive/MyDrive/Raman_machine_learning/models/v0.4.3/8.pretrain_fmten_scheduler/"
 trainer: "fit"
 optimizer:
         lr: 1e-3
         type: "Adam"
-checkpoint: "gdrive/MyDrive/Raman_machine_learning/models/v0.4.3/6.pretrain_fmten_direct_embedding/default/version_0/checkpoints/epoch=66-step=101504.ckpt"
+#checkpoint: "gdrive/MyDrive/Raman_machine_learning/models/v0.4.3/6.pretrain_fmten_direct_embedding/default/version_0/checkpoints/epoch=66-step=101504.ckpt"
