@@ -8,15 +8,14 @@ import torch
 import json
 import re
 
-def range_encode(value,min,max,steps):
+
+def range_encode(value, min, max, steps):
     value = torch.Tensor([value])
-    range_space = torch.linspace(min,max,steps)
-    greater = torch.greater_equal(value,range_space).sum()
+    range_space = torch.linspace(min, max, steps)
+    greater = torch.greater_equal(value, range_space).sum()
     encoded = torch.zeros_like(range_space)
     encoded[greater-1] += 1
     return encoded
-
-
 
 
 class EncodedGraph:
@@ -52,24 +51,27 @@ class CrystalGraph:
         if np.size(np.unique(self.bond_atom_1)) < len(self.atomic_numbers):
             raise RuntimeError("Isolated atoms found in the structure")
         self.state = np.array([0.0, 0.0], dtype=np.float)
+
     @property
     def get_atomic_periods(self):
         num_atoms = self.num_atoms
-        encoded_atomic_periods = torch.zeros((num_atoms,9),dtype=torch.float)
-        for i,atom in enumerate(self.atoms):
-            encoded_atomic_periods[i,atom.row-1] = 1
+        encoded_atomic_periods = torch.zeros((num_atoms, 9), dtype=torch.float)
+        for i, atom in enumerate(self.atoms):
+            encoded_atomic_periods[i, atom.row-1] = 1
         return encoded_atomic_periods
+
     @property
     def get_atomic_groups(self):
         num_atoms = self.num_atoms
-        encoded_atomic_groups = torch.zeros((num_atoms,18),dtype=torch.float)
+        encoded_atomic_groups = torch.zeros((num_atoms, 18), dtype=torch.float)
         for i, atom in enumerate(self.atoms):
-            encoded_atomic_groups[i,atom.group-1] = 1
+            encoded_atomic_groups[i, atom.group-1] = 1
         return encoded_atomic_groups
+
     @property
     def get_atomic_blocks(self):
         num_atoms = self.num_atoms
-        encoded_atomic_groups = torch.zeros((num_atoms,4),dtype=torch.float)
+        encoded_atomic_groups = torch.zeros((num_atoms, 4), dtype=torch.float)
         for i, atom in enumerate(self.atoms):
             block = atom.block
             if block == "s":
@@ -79,67 +81,83 @@ class CrystalGraph:
             elif block == "d":
                 id = 2
             elif block == "f":
-                id =3
-            encoded_atomic_groups[i,id] = 1
+                id = 3
+            encoded_atomic_groups[i, id] = 1
         return encoded_atomic_groups
+
     @staticmethod
-    def Gassian_expand(value_list,min_value,max_value,intervals,expand_width):
-        centers = torch.linspace(min_value,max_value,intervals)
+    def Gassian_expand(value_list, min_value, max_value, intervals, expand_width):
+        centers = torch.linspace(min_value, max_value, intervals)
         value_list = torch.FloatTensor(value_list)
-        result  = torch.exp(-(value_list[:,None]-centers[None,:])**2/expand_width**2)
+        result = torch.exp(-(value_list[:, None] -
+                             centers[None, :])**2/expand_width**2)
         return result
+
     @property
     def get_atomic_electronegativity(self):
         electronegativity = []
         meet_nan = False
         for atom in self.atoms:
-            if np.isnan(atom.X)  :
+            if np.isnan(atom.X):
                 electronegativity.append(-100)
                 meet_nan = True
             else:
                 electronegativity.append(atom.X)
-        encoded_electronegativity = self.Gassian_expand(electronegativity,0.5,4.0,20,0.18)
+        encoded_electronegativity = self.Gassian_expand(
+            electronegativity, 0.5, 4.0, 20, 0.18)
         return encoded_electronegativity
+
     @property
     def get_atomic_covalence_redius(self):
-        with open("utils/covalence_radius.json","r") as f:
+        with open("utils/covalence_radius.json", "r") as f:
             covalence_radius_table = json.loads(f.read())
-        cov_rad_list = [covalence_radius_table[Z-1] for Z in self.atomic_numbers]
-        encoded_cov_rad = self.Gassian_expand(cov_rad_list,50,250,20,10)
+        cov_rad_list = [covalence_radius_table[Z-1]
+                        for Z in self.atomic_numbers]
+        encoded_cov_rad = self.Gassian_expand(cov_rad_list, 50, 250, 20, 10)
         return encoded_cov_rad
+
     @property
     def get_atomic_first_ionization_energy(self):
-        with open("utils/first_ionization_energy.json","r") as f:
+        with open("utils/first_ionization_energy.json", "r") as f:
             first_ionization_energy_table = json.loads(f.read())
-        FIE_list = [first_ionization_energy_table[Z-1] for Z in self.atomic_numbers]
-        encoded_FIE = self.Gassian_expand(FIE_list,3,25,20,1.1)
+        FIE_list = [first_ionization_energy_table[Z-1]
+                    for Z in self.atomic_numbers]
+        encoded_FIE = self.Gassian_expand(FIE_list, 3, 25, 20, 1.1)
         return encoded_FIE
+
     @property
     def get_atomic_electron_affinity(self):
-        with open("utils/electron_affinity.json","r") as f:
+        with open("utils/electron_affinity.json", "r") as f:
             electron_affinity_table = json.loads(f.read())
-        elec_affi_list = [electron_affinity_table[Z-1] for Z in self.atomic_numbers]
-        encoded_elec_affi = self.Gassian_expand(elec_affi_list,-3,3.7,20,0.33)
+        elec_affi_list = [electron_affinity_table[Z-1]
+                          for Z in self.atomic_numbers]
+        encoded_elec_affi = self.Gassian_expand(
+            elec_affi_list, -3, 3.7, 20, 0.33)
         return encoded_elec_affi
+
     @property
     def get_valence_electron_number(self):
         patterm = re.compile(r"\d+[spdf]\d+")
         num_atoms = self.num_atoms
-        encoded_valence_electron_number = torch.zeros((num_atoms,12),dtype=torch.float)
+        encoded_valence_electron_number = torch.zeros(
+            (num_atoms, 12), dtype=torch.float)
         for i, atom in enumerate(self.atoms):
             electronic_structure = atom.electronic_structure
             valence_structure = patterm.findall(electronic_structure)
-            valence_electron_number = np.array([int(i[2:]) for i in valence_structure]).sum()
-            encoded_valence_electron_number[i,valence_electron_number-1] = 1
+            valence_electron_number = np.array(
+                [int(i[2:]) for i in valence_structure]).sum()
+            encoded_valence_electron_number[i, valence_electron_number-1] = 1
         return encoded_valence_electron_number
+
     def get_raman_mode_numbers(self):
         space_group_calculater = SpacegroupAnalyzer(self.structure)
         symmetrized_structure = space_group_calculater.get_symmetrized_structure()
         space_group = symmetrized_structure.spacegroup.int_number
         wyckoff = symmetrized_structure.wyckoff_letters
-        wyckoff_letter, wyckoff_count = np.unique(wyckoff,return_counts=True)
-        wyckoff =  [f"{count}{letter}" for count,letter in zip(wyckoff_count,wyckoff_letter)]
-        with open("utils/raman_modes.json","r") as f:
+        wyckoff_letter, wyckoff_count = np.unique(wyckoff, return_counts=True)
+        wyckoff = [f"{count}{letter}" for count,
+                   letter in zip(wyckoff_count, wyckoff_letter)]
+        with open("utils/raman_modes.json", "r") as f:
             raman_table = json.loads(f.read())
         space_group_modes = []
         for modes in raman_table:
@@ -150,14 +168,17 @@ class CrystalGraph:
             if modes["WP"] in wyckoff:
                 num_raman += modes["num_modes"]
         return num_raman
+
     def encode_bond_length_with_Gaussian_distance(self, min_length: float = 0.0, max_length: float = 5.0, intervals: int = 100, expand_width: float = 0.5) -> np.ndarray:
         bond_length = self.bond_length
         centers = np.linspace(min_length, max_length, intervals)
         result = np.exp(-(bond_length[:, None] -
                           centers[None, :])**2/expand_width**2)
         return result
+
     def convert_to_model_input(self) -> Dict:
-        atoms = torch.cat((self.get_atomic_groups,self.get_atomic_periods,self.get_atomic_electronegativity,self.get_atomic_covalence_redius,self.get_atomic_first_ionization_energy,self.get_atomic_electron_affinity,self.get_atomic_blocks),dim=1)
+        atoms = torch.cat((self.get_atomic_groups, self.get_atomic_periods, self.get_atomic_electronegativity, self.get_atomic_covalence_redius,
+                           self.get_atomic_first_ionization_energy, self.get_atomic_electron_affinity, self.get_atomic_blocks), dim=1)
         state = torch.FloatTensor(self.state)
         bonds = torch.FloatTensor(
             self.encode_bond_length_with_Gaussian_distance())
@@ -170,51 +191,110 @@ class CrystalGraph:
         return input
 
 
-
 class CrystalEmbedding(CrystalGraph):
-    def __init__(self, structure,max_atoms=150):
+    def __init__(self, structure, max_atoms=150):
         super().__init__(structure)
         self.max_atoms = max_atoms
         if self.num_atoms > self.max_atoms:
             raise ValueError(f"Crystal exceeds max_atoms({self.max_atoms})")
-    
+
     @property
     def padding(self):
         has_atoms = torch.zeros((self.num_atoms,))
         not_atoms = torch.ones((self.max_atoms-self.num_atoms,))
-        padding = torch.cat((has_atoms,not_atoms)).bool()
+        padding = torch.cat((has_atoms, not_atoms)).bool()
         return padding
 
     @property
     def positions(self):
         sites = self.structure.sites
-        for (i,site) in enumerate(sites):
+        for (i, site) in enumerate(sites):
             x = site.x
             y = site.y
             z = site.z
-            position = torch.FloatTensor([x,y,z])
+            position = torch.FloatTensor([[x, y, z]])
             position = torch.asinh(position)
-            position = self.Gassian_expand(position,min_value=-3,max_value=6,intervals=20,expand_width=0.45) #(3,position_info) (3,20)
-            position = torch.reshape(position,(1,-1)) # (1, position_info) (1, 60)
+            # position = self.Gassian_expand(position,min_value=-3,max_value=6,intervals=20,expand_width=0.45) #(3,position_info) (3,20)
+            # position = torch.reshape(position,(1,-1)) # (1, position_info) (1, 60)
             if i == 0:
-                positions = position
+                positions = position  # (1,3)
             else:
-                positions = torch.cat((positions,position),dim=0) # (num_atoms, position_info) (num_atoms, 60)
+                # (num_atoms, position_info) (num_atoms, 3)
+                positions = torch.cat((positions, position), dim=0)
         return positions
+
+    @property
+    def get_atomic_electronegativity(self):
+        electronegativity = []
+        meet_nan = False
+        for atom in self.atoms:
+            if np.isnan(atom.X):
+                electronegativity.append(-100)
+                meet_nan = True
+            else:
+                electronegativity.append(atom.X)
+        return electronegativity
+
+    @property
+    def get_atomic_covalence_radius(self):
+        with open("utils/covalence_radius.json", "r") as f:
+            covalence_radius_table = json.loads(f.read())
+        cov_rad_list = [covalence_radius_table[Z-1]
+                        for Z in self.atomic_numbers]
+        return cov_rad_list
+
+    @property
+    def get_atomic_first_ionization_energy(self):
+        with open("utils/first_ionization_energy.json", "r") as f:
+            first_ionization_energy_table = json.loads(f.read())
+        FIE_list = [first_ionization_energy_table[Z-1]
+                    for Z in self.atomic_numbers]
+        return FIE_list
+
+    @property
+    def get_atomic_electron_affinity(self):
+        with open("utils/electron_affinity.json", "r") as f:
+            electron_affinity_table = json.loads(f.read())
+        elec_affi_list = [electron_affinity_table[Z-1]
+                          for Z in self.atomic_numbers]
+        return elec_affi_list
+
     def convert_to_model_input(self) -> Dict:
-        atoms_fea = torch.cat((self.get_atomic_groups,self.get_atomic_periods,self.get_atomic_electronegativity,self.get_atomic_covalence_redius,self.get_atomic_first_ionization_energy,self.get_atomic_electron_affinity,self.get_atomic_blocks),dim=1) #(num_atoms, 111)
+        atoms_fea = torch.cat((self.get_atomic_groups, self.get_atomic_periods,
+                               self.get_atomic_blocks), dim=1)  # (num_atoms, 31)
         embedding_dim = atoms_fea.shape[1]
-        atoms_padding = torch.zeros((self.max_atoms-self.num_atoms,embedding_dim))
-        atoms_padded = torch.cat((atoms_fea,atoms_padding),dim=0)
+        atoms_padding = torch.zeros(
+            (self.max_atoms-self.num_atoms, embedding_dim))
+        atoms_padded = torch.cat((atoms_fea, atoms_padding), dim=0)
 
         positions_dim = self.positions.shape[1]
-        positions_padding = torch.zeros((self.max_atoms-self.num_atoms,positions_dim))
-        positions_padded = torch.cat((self.positions,positions_padding),dim=0)
+        positions_padding = torch.ones(
+            (self.max_atoms-self.num_atoms, positions_dim))*(-100)
+        positions_padded = torch.cat(
+            (self.positions, positions_padding), dim=0)  # (max_atoms, 3)
+
+        elecneg = torch.FloatTensor(self.get_atomic_electronegativity).reshape(
+            (-1, 1))  # (num_atoms,1)
+        padding = torch.ones((self.max_atoms-self.num_atoms, 1))*(-100)
+        elecneg_padded = torch.cat((elecneg, padding), dim=0)
+
+        cov_rad = torch.FloatTensor(self.get_atomic_covalence_radius).reshape(
+            (-1, 1))  # (num_atoms,1)
+        covrad_padded = torch.cat((cov_rad, padding), dim=0)
+
+        FIE = torch.FloatTensor(self.get_atomic_first_ionization_energy).reshape(
+            (-1, 1))  # (num_atoms,1)
+        FIE_padded = torch.cat((FIE, padding), dim=0)
+
+        elec_affi = torch.FloatTensor(
+            self.get_atomic_electron_affinity).reshape((-1, 1))  # (num_atoms,1)
+        elecaffi_padded = torch.cat((elec_affi, padding), dim=0)
 
         lattice = torch.FloatTensor(self.structure.lattice.matrix)
         lattice = torch.flatten(lattice)
         lattice = torch.asinh(lattice)
-        lattice = self.Gassian_expand(lattice,min_value=-3,max_value=6,intervals=20,expand_width=0.45)  #(9,lattice_info)
-        lattice = torch.flatten(lattice) #(180,)
- 
-        return {"atoms":atoms_padded,"positions":positions_padded,"padding_mask":self.padding,"lattice":lattice}
+        lattice = self.Gassian_expand(
+            lattice, min_value=-3, max_value=6, intervals=40, expand_width=0.23)  # (9,lattice_info)
+        lattice = torch.flatten(lattice)  # (360,)
+
+        return {"atoms": atoms_padded, "elecneg": elecneg_padded, "covrad": covrad_padded, "FIE": FIE_padded, "elecaffi": elecaffi_padded, "positions": positions_padded, "padding_mask": self.padding, "lattice": lattice}
