@@ -63,11 +63,11 @@ class Experiment(pl.LightningModule):
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         # (batch_size, max_atoms, 40)
-        elecneg = self.Gassian_expand(elecneg, 0.5, 4.0, 40, 0.88, device)
+        elecneg = self.Gassian_expand(elecneg, 0.5, 4.0, 40, 0.088, device)
         # (batch_size, max_atoms, 40)
         covrad = self.Gassian_expand(covrad, 50, 250, 40, 5, device)
         # (batch_size, max_atoms, 40)
-        FIE = self.Gassian_expand(FIE, 3, 25, 40, 0.55, device)
+        FIE = self.Gassian_expand(FIE, 3, 25, 40, 0.58, device)
         # (batch_size, max_atoms, 40)
         elecaffi = self.Gassian_expand(elecaffi, -3, 3.7, 40, 0.17, device)
         # (batch_size, max_atoms, 191)
