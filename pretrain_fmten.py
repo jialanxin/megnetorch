@@ -74,9 +74,9 @@ class Experiment(pl.LightningModule):
         atoms = torch.cat((atoms, elecneg, covrad, FIE, elecaffi), dim=2)
 
         positions = positions.unsqueeze(dim=3).expand(-1, -1, 3, 40)
-        centers = torch.linspace(-3, 6, 40).to(device)
+        centers = torch.linspace(-4, 4, 40).to(device)
         # (batch_size, max_atoms, 3, 40)
-        positions = torch.exp(-(positions - centers)**2/0.23**2)
+        positions = torch.exp(-(positions - centers)**2/0.2**2)
         # (batch_size, max_atoms, 120)
         positions = torch.flatten(positions, start_dim=2)
 
@@ -180,8 +180,8 @@ if __name__ == "__main__":
         config = yaml.load(f.read(), Loader=yaml.BaseLoader)
     prefix = config["prefix"]
 
-    train_set = torch.load("./materials/mp/Train_fmten_set.pt")
-    validate_set = torch.load("./materials/mp/Valid_fmten_set.pt")
+    train_set = torch.load("./materials/mp/Train_fmten_set_new.pt")
+    validate_set = torch.load("./materials/mp/Valid_fmten_set_new.pt")
 
     train_dataloader = DataLoader(
         dataset=train_set, batch_size=64, num_workers=4)

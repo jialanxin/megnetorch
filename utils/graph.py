@@ -294,7 +294,7 @@ class CrystalEmbedding(CrystalGraph):
         lattice = torch.flatten(lattice)
         lattice = torch.asinh(lattice)
         lattice = self.Gassian_expand(
-            lattice, min_value=-3, max_value=6, intervals=40, expand_width=0.23)  # (9,lattice_info)
+            lattice, min_value=-4, max_value=4, intervals=40, expand_width=0.2)  # (9,lattice_info)
         lattice = torch.flatten(lattice)  # (360,)
 
         return {"atoms": atoms_padded, "elecneg": elecneg_padded, "covrad": covrad_padded, "FIE": FIE_padded, "elecaffi": elecaffi_padded, "positions": positions_padded, "padding_mask": self.padding, "lattice": lattice}

@@ -108,8 +108,8 @@ def prepare_datesets(json_file):
 if __name__=="__main__":
     train_set = prepare_datesets("materials/mp/Train_data.json")
     print(len(train_set))
-    torch.save(train_set,"materials/mp/Train_fmten_set.pt")
+    torch.save(train_set,"materials/mp/Train_fmten_set_new.pt")
 
     validate_set = prepare_datesets("materials/mp/Valid_data.json")
     print(len(validate_set))
-    torch.save(validate_set,"materials/mp/Valid_fmten_set.pt")
+    torch.save(validate_set,"materials/mp/Valid_fmten_set_new.pt")
