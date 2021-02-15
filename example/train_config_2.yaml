@@ -1,7 +1,7 @@
 prefix:
-  "gdrive/MyDrive/Raman_machine_learning/models/v0.4.3/10.pretrain_fmten_new_embedding_128/"
+  "gdrive/MyDrive/Raman_machine_learning/models/v0.4.3/11.pretrain_fmten_new_embedding_64/"
 trainer: "fit"
 optimizer:
         lr: 1e-3
         type: "Adam"
-checkpoint: "gdrive/MyDrive/Raman_machine_learning/models/v0.4.3/10.pretrain_fmten_new_embedding_128/default/version_1/checkpoints/epoch=73-step=112109.ckpt"
+#checkpoint: "gdrive/MyDrive/Raman_machine_learning/models/v0.4.3/10.pretrain_fmten_new_embedding_128/default/version_1/checkpoints/epoch=73-step=112109.ckpt"

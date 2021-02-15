@@ -13,11 +13,11 @@ from torch.nn import Embedding, RReLU, ReLU, Dropout
 
 
 def ff(input_dim):
-    return torch.nn.Sequential(torch.nn.Linear(input_dim, 128))
+    return torch.nn.Sequential(torch.nn.Linear(input_dim, 64))
 
 
 def ff_output(input_dim, output_dim):
-    return torch.nn.Sequential(torch.nn.Linear(input_dim, 64), torch.nn.RReLU(), Dropout(0.1), torch.nn.Linear(64, 32), torch.nn.RReLU(), Dropout(0.1), torch.nn.Linear(32, output_dim))
+    return torch.nn.Sequential(torch.nn.Linear(input_dim, 128), torch.nn.RReLU(), Dropout(0.1), torch.nn.Linear(128, 64), torch.nn.RReLU(), Dropout(0.1), torch.nn.Linear(64, output_dim))
 
 
 class Experiment(pl.LightningModule):
@@ -25,14 +25,14 @@ class Experiment(pl.LightningModule):
         super().__init__()
         self.save_hyperparameters()
         self.lr = lr
-        self.atom_embedding = ff(191)
-        self.position_embedding = ff(120)
-        self.lattice_embedding = ff(360)
+        self.atom_embedding = ff(111)
+        self.position_embedding = ff(60)
+        self.lattice_embedding = ff(180)
         encode_layer = torch.nn.TransformerEncoderLayer(
-            d_model=128, nhead=8, dim_feedforward=512)
+            d_model=64, nhead=8, dim_feedforward=256)
         self.encoder = torch.nn.TransformerEncoder(
             encode_layer, num_layers=num_enc)
-        self.readout = ff_output(input_dim=128, output_dim=1)
+        self.readout = ff_output(input_dim=64, output_dim=1)
 
     @staticmethod
     def Gassian_expand(value_list, min_value, max_value, intervals, expand_width, device):
@@ -62,22 +62,22 @@ class Experiment(pl.LightningModule):
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        # (batch_size, max_atoms, 40)
-        elecneg = self.Gassian_expand(elecneg, 0.5, 4.0, 40, 0.088, device)
-        # (batch_size, max_atoms, 40)
-        covrad = self.Gassian_expand(covrad, 50, 250, 40, 5, device)
-        # (batch_size, max_atoms, 40)
-        FIE = self.Gassian_expand(FIE, 3, 25, 40, 0.58, device)
-        # (batch_size, max_atoms, 40)
-        elecaffi = self.Gassian_expand(elecaffi, -3, 3.7, 40, 0.17, device)
-        # (batch_size, max_atoms, 191)
+        # (batch_size, max_atoms, 20)
+        elecneg = self.Gassian_expand(elecneg, 0.5, 4.0, 20, 0.18, device)
+        # (batch_size, max_atoms, 20)
+        covrad = self.Gassian_expand(covrad, 50, 250, 20, 10, device)
+        # (batch_size, max_atoms, 20)
+        FIE = self.Gassian_expand(FIE, 3, 25, 20, 1.15, device)
+        # (batch_size, max_atoms, 20)
+        elecaffi = self.Gassian_expand(elecaffi, -3, 3.7, 20, 0.34, device)
+        # (batch_size, max_atoms, 111)
         atoms = torch.cat((atoms, elecneg, covrad, FIE, elecaffi), dim=2)
 
-        positions = positions.unsqueeze(dim=3).expand(-1, -1, 3, 40)
-        centers = torch.linspace(-4, 4, 40).to(device)
-        # (batch_size, max_atoms, 3, 40)
-        positions = torch.exp(-(positions - centers)**2/0.2**2)
-        # (batch_size, max_atoms, 120)
+        positions = positions.unsqueeze(dim=3).expand(-1, -1, 3, 20)
+        centers = torch.linspace(-4, 4, 20).to(device)
+        # (batch_size, max_atoms, 3, 20)
+        positions = torch.exp(-(positions - centers)**2/0.4**2)
+        # (batch_size, max_atoms, 60)
         positions = torch.flatten(positions, start_dim=2)
 
         atoms = self.atom_embedding(atoms)  # (batch_size,max_atoms,atoms_info)
@@ -180,8 +180,8 @@ if __name__ == "__main__":
         config = yaml.load(f.read(), Loader=yaml.BaseLoader)
     prefix = config["prefix"]
 
-    train_set = torch.load("./materials/mp/Train_fmten_set_new.pt")
-    validate_set = torch.load("./materials/mp/Valid_fmten_set_new.pt")
+    train_set = torch.load("./materials/mp/Train_fmten_set_new_64.pt")
+    validate_set = torch.load("./materials/mp/Valid_fmten_set_new_64.pt")
 
     train_dataloader = DataLoader(
         dataset=train_set, batch_size=64, num_workers=4)
