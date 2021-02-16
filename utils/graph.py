@@ -289,10 +289,7 @@ class CrystalEmbedding(CrystalGraph):
             self.get_atomic_electron_affinity).reshape((-1, 1))  # (num_atoms,1)
         elecaffi_padded = torch.cat((elec_affi, padding), dim=0)
 
-        lattice = torch.FloatTensor(self.structure.lattice.matrix)
-        lattice = torch.flatten(lattice)
-        lattice = self.Gassian_expand(
-            lattice, min_value=-15, max_value=15, intervals=20, expand_width=1.5)  # (9,lattice_info)
-        lattice = torch.flatten(lattice)  # (180,)
+        lattice = torch.FloatTensor(self.structure.lattice.matrix).reshape(-1,1) #(9, 1)
+
 
         return {"atoms": atoms_padded, "elecneg": elecneg_padded, "covrad": covrad_padded, "FIE": FIE_padded, "elecaffi": elecaffi_padded, "positions": positions_padded, "padding_mask": self.padding, "lattice": lattice}

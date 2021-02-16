@@ -26,8 +26,8 @@ class Experiment(pl.LightningModule):
         self.save_hyperparameters()
         self.lr = lr
         self.atom_embedding = ff(111)
-        self.position_embedding = ff(60)
-        self.lattice_embedding = ff(180)
+        self.position_embedding = ff(120)
+        self.lattice_embedding = ff(360)
         encode_layer = torch.nn.TransformerEncoderLayer(
             d_model=64, nhead=8, dim_feedforward=256)
         self.encoder = torch.nn.TransformerEncoder(
@@ -47,7 +47,7 @@ class Experiment(pl.LightningModule):
         atoms = encoded_graph["atoms"]
         # padding_mask: (batch_size, max_atoms)
         padding_mask = encoded_graph["padding_mask"]
-        # lattice: (batch_size, 180)
+        # lattice: (batch_size, 9, 1)
         lattice = encoded_graph["lattice"]
         # (batch_size, max_atoms, 1)
         elecneg = encoded_graph["elecneg"]
@@ -73,17 +73,21 @@ class Experiment(pl.LightningModule):
         # (batch_size, max_atoms, 111)
         atoms = torch.cat((atoms, elecneg, covrad, FIE, elecaffi), dim=2)
 
-        positions = positions.unsqueeze(dim=3).expand(-1, -1, 3, 20)
-        centers = torch.linspace(-15, 15, 20).to(device)
-        # (batch_size, max_atoms, 3, 20)
-        positions = torch.exp(-(positions - centers)**2/1.5**2)
-        # (batch_size, max_atoms, 60)
+        positions = positions.unsqueeze(dim=3).expand(-1, -1, 3, 40)
+        centers = torch.linspace(-15, 18, 40).to(device)
+        # (batch_size, max_atoms, 3, 40)
+        positions = torch.exp(-(positions - centers)**2/0.83**2)
+        # (batch_size, max_atoms, 120)
         positions = torch.flatten(positions, start_dim=2)
 
         atoms = self.atom_embedding(atoms)  # (batch_size,max_atoms,atoms_info)
         # (batch_size,max_atoms,positions_info)
         positions = self.position_embedding(positions)
         atoms = atoms+positions  # (batch_size,max_atoms,atoms_info)
+
+        lattice = self.Gassian_expand(
+            lattice, -15, 18, 40, 0.83, device)  # (batch_size, 9, 40)
+        lattice = torch.flatten(lattice, start_dim=1)  # (batch_size,360)
         lattice = self.lattice_embedding(lattice)  # (batch_size,lacttice_info)
         # (batch_size,1,lacttice_info)
         lattice = torch.unsqueeze(lattice, dim=1)
@@ -180,8 +184,8 @@ if __name__ == "__main__":
         config = yaml.load(f.read(), Loader=yaml.BaseLoader)
     prefix = config["prefix"]
 
-    train_set = torch.load("./materials/mp/Train_fmten_set_native_64.pt")
-    validate_set = torch.load("./materials/mp/Valid_fmten_set_native_64.pt")
+    train_set = torch.load("./materials/mp/Train_fmten_set.pt")
+    validate_set = torch.load("./materials/mp/Valid_fmten_set.pt")
 
     train_dataloader = DataLoader(
         dataset=train_set, batch_size=64, num_workers=4)
