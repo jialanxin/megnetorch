@@ -26,8 +26,8 @@ class Experiment(pl.LightningModule):
         self.save_hyperparameters()
         self.lr = lr
         self.atom_embedding = ff(111)
-        self.position_embedding = ff(120)
-        self.lattice_embedding = ff(360)
+        self.position_embedding = ff(60)
+        self.lattice_embedding = ff(180)
         encode_layer = torch.nn.TransformerEncoderLayer(
             d_model=64, nhead=8, dim_feedforward=256)
         self.encoder = torch.nn.TransformerEncoder(
@@ -73,11 +73,11 @@ class Experiment(pl.LightningModule):
         # (batch_size, max_atoms, 111)
         atoms = torch.cat((atoms, elecneg, covrad, FIE, elecaffi), dim=2)
 
-        positions = positions.unsqueeze(dim=3).expand(-1, -1, 3, 40)
-        centers = torch.linspace(-15, 18, 40).to(device)
-        # (batch_size, max_atoms, 3, 40)
-        positions = torch.exp(-(positions - centers)**2/0.83**2)
-        # (batch_size, max_atoms, 120)
+        positions = positions.unsqueeze(dim=3).expand(-1, -1, 3, 20)
+        centers = torch.linspace(-15, 18, 20).to(device)
+        # (batch_size, max_atoms, 3, 20)
+        positions = torch.exp(-(positions - centers)**2/1.65**2)
+        # (batch_size, max_atoms, 60)
         positions = torch.flatten(positions, start_dim=2)
 
         atoms = self.atom_embedding(atoms)  # (batch_size,max_atoms,atoms_info)
@@ -86,8 +86,8 @@ class Experiment(pl.LightningModule):
         atoms = atoms+positions  # (batch_size,max_atoms,atoms_info)
 
         lattice = self.Gassian_expand(
-            lattice, -15, 18, 40, 0.83, device)  # (batch_size, 9, 40)
-        lattice = torch.flatten(lattice, start_dim=1)  # (batch_size,360)
+            lattice, -15, 18, 20, 1.65, device)  # (batch_size, 9, 20)
+        lattice = torch.flatten(lattice, start_dim=1)  # (batch_size,180)
         lattice = self.lattice_embedding(lattice)  # (batch_size,lacttice_info)
         # (batch_size,1,lacttice_info)
         lattice = torch.unsqueeze(lattice, dim=1)
