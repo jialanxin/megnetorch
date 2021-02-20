@@ -117,20 +117,30 @@ class Experiment(pl.LightningModule):
         loss = F.l1_loss(predicted_spectrum, ramans)
         # print(f"loss:{loss}")
         self.log("train_loss", loss, on_epoch=True, on_step=False)
+        spectrum_round = torch.round(predicted_spectrum)
+        loss_round = F.l1_loss(spectrum_round,ramans)
+        self.log("train_loss_round",loss_round,on_epoch=True,on_step=False)
         similarity = F.cosine_similarity(
             predicted_spectrum, ramans).mean()
         self.log("train_simi", similarity, on_epoch=True, on_step=False)
-        return {"loss":loss,"simi":similarity}
+        Hamming = torch.eq(spectrum_round,ramans).float().mean()
+        self.log("train_hamming", Hamming, on_epoch=True, on_step=False)
+        return loss
 
     def validation_step(self, batch, batch_idx):
         _, ramans = batch
         predicted_spectrum = self.shared_procedure(batch)
         loss = F.l1_loss(predicted_spectrum, ramans)
         self.log("val_loss", loss, on_epoch=True, on_step=False)
+        spectrum_round = torch.round(predicted_spectrum)
+        loss_round = F.l1_loss(spectrum_round,ramans)
+        self.log("val_loss_round",loss_round,on_epoch=True,on_step=False)
         similarity = F.cosine_similarity(
             predicted_spectrum, ramans).mean()
         self.log("val_simi", similarity, on_epoch=True, on_step=False)
-        return {"loss": loss, "simi": similarity}
+        Hamming = torch.eq(spectrum_round,ramans).float().mean()
+        self.log("val_hamming", Hamming, on_epoch=True, on_step=False)
+        return loss
 
     def configure_optimizers(self):
         if self.hparams.optim_type == "AdamW":
@@ -215,8 +225,8 @@ if __name__=="__main__":
         try:
             path = config["checkpoint"]
             trainer = pl.Trainer(resume_from_checkpoint=path, gpus=1 if torch.cuda.is_available(
-            ) else 0, logger=logger, callbacks=[checkpoint_callback], max_epochs=1000)
+            ) else 0, logger=logger, callbacks=[checkpoint_callback], max_epochs=4000)
         except KeyError:
             trainer = pl.Trainer(gpus=1 if torch.cuda.is_available() else 0, logger=logger,
-                                 callbacks=[checkpoint_callback],  max_epochs=3000)
+                                 callbacks=[checkpoint_callback],  max_epochs=4000)
         trainer.fit(experiment, train_dataloader, validate_dataloader)
