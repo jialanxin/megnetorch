@@ -228,5 +228,5 @@ if __name__=="__main__":
             ) else 0, logger=logger, callbacks=[checkpoint_callback], max_epochs=4000)
         except KeyError:
             trainer = pl.Trainer(gpus=1 if torch.cuda.is_available() else 0, logger=logger,
-                                 callbacks=[checkpoint_callback],  max_epochs=4000)
+                                 callbacks=[checkpoint_callback],  max_epochs=2000)
         trainer.fit(experiment, train_dataloader, validate_dataloader)
