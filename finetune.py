@@ -104,6 +104,7 @@ class Experiment(pl.LightningModule):
         system_out = atoms[0]  # (batch_size,atoms_info)
 
         output_spectrum = self.readout(system_out)  # (batch_size, raman_info)
+        output_spectrum = torch.exp(output_spectrum)
 
         return output_spectrum
 
