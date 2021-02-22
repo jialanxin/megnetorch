@@ -125,7 +125,7 @@ class Experiment(pl.LightningModule):
         self.log("train_simi", similarity, on_epoch=True, on_step=False)
         Hamming = torch.eq(spectrum_round,ramans).float().mean()
         self.log("train_hamming", Hamming, on_epoch=True, on_step=False)
-        return loss
+        return loss+1-similarity
 
     def validation_step(self, batch, batch_idx):
         _, ramans = batch
@@ -140,7 +140,7 @@ class Experiment(pl.LightningModule):
         self.log("val_simi", similarity, on_epoch=True, on_step=False)
         Hamming = torch.eq(spectrum_round,ramans).float().mean()
         self.log("val_hamming", Hamming, on_epoch=True, on_step=False)
-        return loss
+        return loss+1-similarity
 
     def configure_optimizers(self):
         if self.hparams.optim_type == "AdamW":
@@ -228,5 +228,5 @@ if __name__=="__main__":
             ) else 0, logger=logger, callbacks=[checkpoint_callback], max_epochs=4000)
         except KeyError:
             trainer = pl.Trainer(gpus=1 if torch.cuda.is_available() else 0, logger=logger,
-                                 callbacks=[checkpoint_callback],  max_epochs=2000)
+                                 callbacks=[checkpoint_callback],  max_epochs=4000)
         trainer.fit(experiment, train_dataloader, validate_dataloader)
