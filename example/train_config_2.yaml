@@ -1,5 +1,5 @@
 prefix:
-  "/home/jlx/v0.4.3/23.finetune_loss+simi/"
+  "/home/jlx/v0.4.3/24.finetune_loss+2simi/"
 trainer: "fit"
 optimizer:
         lr: 1e-3

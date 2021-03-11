@@ -128,7 +128,7 @@ class Experiment(pl.LightningModule):
         self.log("train_simi", similarity, on_epoch=True, on_step=False)
         Hamming = torch.eq(spectrum_round,ramans).float().mean()
         self.log("train_hamming", Hamming, on_epoch=True, on_step=False)
-        return loss.mean()+1-similarity
+        return loss.mean()+(1-similarity)*2
     def validation_step(self, batch, batch_idx):
         _, ramans = batch
         predicted_spectrum = self.shared_procedure(batch)
@@ -136,7 +136,7 @@ class Experiment(pl.LightningModule):
         self.log("val_loss", loss.mean(), on_epoch=True, on_step=False)
         loss_weight = F.softmax(ramans,dim=1)
         loss_weighed = torch.sum(loss*loss_weight,dim=1).mean()
-        self.log("train_loss_weighed", loss_weighed, on_epoch=True, on_step=False)
+        self.log("val_loss_weighed", loss_weighed, on_epoch=True, on_step=False)
         spectrum_round = torch.round(predicted_spectrum)
         loss_round = F.l1_loss(spectrum_round,ramans)
         self.log("val_loss_round",loss_round,on_epoch=True,on_step=False)
@@ -145,7 +145,7 @@ class Experiment(pl.LightningModule):
         self.log("val_simi", similarity, on_epoch=True, on_step=False)
         Hamming = torch.eq(spectrum_round,ramans).float().mean()
         self.log("val_hamming", Hamming, on_epoch=True, on_step=False)
-        return loss.mean()+1-similarity
+        return loss.mean()+(1-similarity)*2
 
     def configure_optimizers(self):
         if self.hparams.optim_type == "AdamW":
