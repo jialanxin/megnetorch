@@ -7,7 +7,6 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from torch.utils.data import DataLoader
 import torch
 import torch.nn.functional as F
-from dataloader import collate_fn
 from dataset import StructureFmtEnDataset
 from torch.nn import Embedding, RReLU, ReLU, Dropout
 
