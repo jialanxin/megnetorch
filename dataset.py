@@ -34,7 +34,7 @@ class StructureRamanDataset(Dataset):
             structure = IStructure.from_dict(item)
             try:
                 raman = torch.FloatTensor(item["raman"])
-                graph = CrystalEmbedding(structure)
+                graph = CrystalEmbedding(structure,max_atoms=30)
             except ValueError:
                 continue
             except RuntimeError:
@@ -104,14 +104,14 @@ class StructureRamanModesDataset(Dataset):
 def prepare_datesets(json_file):
     with open(json_file, "r") as f:
         data = json.loads(f.read())
-    dataset = StructureFmtEnDataset(data)
+    dataset = StructureRamanDataset(data)
     return dataset
 
 if __name__=="__main__":
-    train_set = prepare_datesets("materials/mp/Train_data.json")
+    train_set = prepare_datesets("materials/JVASP/Train_CrystalRamans.json")
     print(len(train_set))
-    torch.save(train_set,"materials/mp/Train_fmten_set.pt")
+    torch.save(train_set,"materials/JVASP/Train_raman_set.pt")
 
-    validate_set = prepare_datesets("materials/mp/Valid_data.json")
+    validate_set = prepare_datesets("materials/JVASP/Valid_CrystalRamans.json")
     print(len(validate_set))
-    torch.save(validate_set,"materials/mp/Valid_fmten_set.pt")
+    torch.save(validate_set,"materials/JVASP/Valid_raman_set.pt")

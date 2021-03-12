@@ -1,5 +1,5 @@
 prefix:
-  "/home/jlx/v0.4.4/1.pretrain_crystals<30atoms/"
+  "/home/jlx/v0.4.4/2.finetune_crystals<30atoms/"
 trainer: "fit"
 optimizer:
         lr: 1e-3

@@ -25,7 +25,7 @@ class Experiment(pl.LightningModule):
         super().__init__()
         self.save_hyperparameters()
         self.lr = lr
-        pretrain_model = Pretrain.load_from_checkpoint("pretrain/epoch=321-step=487829.ckpt")
+        pretrain_model = Pretrain.load_from_checkpoint("pretrain/epoch=580-step=585066.ckpt")
         self.atom_embedding = pretrain_model.atom_embedding
         self.position_embedding = pretrain_model.position_embedding
         self.lattice_embedding = pretrain_model.lattice_embedding
