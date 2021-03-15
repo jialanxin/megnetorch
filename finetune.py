@@ -145,7 +145,7 @@ class Experiment(pl.LightningModule):
         self.log("val_simi", similarity, on_epoch=True, on_step=False)
         Hamming = torch.eq(spectrum_round,ramans).float().mean()
         self.log("val_hamming", Hamming, on_epoch=True, on_step=False)
-        return loss.mean()+(1-similarity)*4
+        return loss.mean()+(1-similarity)*8
 
     def configure_optimizers(self):
         if self.hparams.optim_type == "AdamW":
