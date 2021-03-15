@@ -14,6 +14,7 @@ atomic_block = MoS2_graph.get_atomic_blocks
 space_group = MoS2_graph.get_raman_mode_numbers()
 padding = MoS2_graph.padding
 positions = MoS2_graph.positions
+atomic_weight = MoS2_graph.get_atomic_weight
 input = MoS2_graph.convert_to_model_input()
 print(input)
 print("end")

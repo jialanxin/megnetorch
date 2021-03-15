@@ -258,6 +258,11 @@ class CrystalEmbedding(CrystalGraph):
                           for Z in self.atomic_numbers]
         return elec_affi_list
 
+    @property
+    def get_atomic_weight(self):
+        atomic_weight = [atom.atomic_mass for atom in self.atoms]
+        return atomic_weight
+
     def convert_to_model_input(self) -> Dict:
         atoms_fea = torch.cat((self.get_atomic_groups, self.get_atomic_periods,
                                self.get_atomic_blocks), dim=1)  # (num_atoms, 31)
@@ -289,7 +294,11 @@ class CrystalEmbedding(CrystalGraph):
             self.get_atomic_electron_affinity).reshape((-1, 1))  # (num_atoms,1)
         elecaffi_padded = torch.cat((elec_affi, padding), dim=0)
 
-        lattice = torch.FloatTensor(self.structure.lattice.matrix).reshape(-1,1) #(9, 1)
+        atomic_weight = torch.FloatTensor(
+            self.get_atomic_weight).reshape((-1, 1))
+        atomic_weight_padded = torch.cat((atomic_weight, padding), dim=0)
 
+        lattice = torch.FloatTensor(
+            self.structure.lattice.matrix).reshape(-1, 1)  # (9, 1)
 
-        return {"atoms": atoms_padded, "elecneg": elecneg_padded, "covrad": covrad_padded, "FIE": FIE_padded, "elecaffi": elecaffi_padded, "positions": positions_padded, "padding_mask": self.padding, "lattice": lattice}
+        return {"atoms": atoms_padded, "elecneg": elecneg_padded, "covrad": covrad_padded, "FIE": FIE_padded, "elecaffi": elecaffi_padded, "AM": atomic_weight_padded, "positions": positions_padded, "padding_mask": self.padding, "lattice": lattice}
