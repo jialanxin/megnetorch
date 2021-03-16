@@ -24,7 +24,7 @@ class Experiment(pl.LightningModule):
         super().__init__()
         self.save_hyperparameters()
         self.lr = lr
-        self.atom_embedding = ff(111)
+        self.atom_embedding = ff(131)
         self.position_embedding = ff(60)
         self.lattice_embedding = ff(180)
         encode_layer = torch.nn.TransformerEncoderLayer(
@@ -56,6 +56,8 @@ class Experiment(pl.LightningModule):
         FIE = encoded_graph["FIE"]
         # (batch_size, max_atoms, 1)
         elecaffi = encoded_graph["elecaffi"]
+        # (batch_size, max_atoms, 1)
+        atmwht = encoded_graph["AM"]
         # (batch_size, max_atoms, 3)
         positions = encoded_graph["positions"]
 
@@ -69,8 +71,11 @@ class Experiment(pl.LightningModule):
         FIE = self.Gassian_expand(FIE, 3, 25, 20, 1.15, device)
         # (batch_size, max_atoms, 20)
         elecaffi = self.Gassian_expand(elecaffi, -3, 3.7, 20, 0.34, device)
+        # (batch_size, max_atoms, 20)
+        atmwht = self.Gassian_expand(atmwht, 0, 210, 20, 10.5, device)
         # (batch_size, max_atoms, 111)
-        atoms = torch.cat((atoms, elecneg, covrad, FIE, elecaffi), dim=2)
+        atoms = torch.cat(
+            (atoms, elecneg, covrad, FIE, elecaffi, atmwht), dim=2)
 
         positions = positions.unsqueeze(dim=3).expand(-1, -1, 3, 20)
         centers = torch.linspace(-15, 18, 20).to(device)

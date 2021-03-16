@@ -1,5 +1,5 @@
 prefix:
-  "/home/jlx/v0.4.4/6.Train_atomic_weight/"
+  "/home/jlx/v0.4.4/7.pretrain_atomic_weight/"
 trainer: "fit"
 optimizer:
         lr: 1e-3
