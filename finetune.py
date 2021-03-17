@@ -137,7 +137,7 @@ class Experiment(pl.LightningModule):
         self.log("train_simi", similarity, on_epoch=True, on_step=False)
         Hamming = torch.eq(spectrum_round, ramans).float().mean()
         self.log("train_hamming", Hamming, on_epoch=True, on_step=False)
-        return loss.mean()+(1-similarity)*4
+        return loss_weighed
 
     def validation_step(self, batch, batch_idx):
         _, ramans = batch
@@ -156,7 +156,7 @@ class Experiment(pl.LightningModule):
         self.log("val_simi", similarity, on_epoch=True, on_step=False)
         Hamming = torch.eq(spectrum_round, ramans).float().mean()
         self.log("val_hamming", Hamming, on_epoch=True, on_step=False)
-        return loss.mean()+(1-similarity)*4
+        return loss_weighed
 
     def configure_optimizers(self):
         if self.hparams.optim_type == "AdamW":
