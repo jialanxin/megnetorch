@@ -1,7 +1,7 @@
 prefix:
-  "/home/jlx/v0.4.4/8.pretrain_atomic_weight_lr_5e-4/"
+  "/home/jlx/v0.4.4/9.finetune_atomic_weight/"
 trainer: "fit"
 optimizer:
-        lr: 5e-4
+        lr: 1e-3
         type: "Adam"
 # checkpoint: "gdrive/MyDrive/Raman_machine_learning/models/v0.4.3/19.finetune_lr_te-4/default/version_0/checkpoints/epoch=1909-step=217739.ckpt"

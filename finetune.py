@@ -21,22 +21,25 @@ def ff_output(input_dim, output_dim):
 
 
 class Experiment(pl.LightningModule):
-    def __init__(self,num_enc=6, optim_type="Adam",lr=1e-3,weight_decay=0.0):
+    def __init__(self, num_enc=6, optim_type="Adam", lr=1e-3, weight_decay=0.0):
         super().__init__()
         self.save_hyperparameters()
         self.lr = lr
-        pretrain_model = Pretrain.load_from_checkpoint("pretrain/epoch=580-step=585066.ckpt")
+        pretrain_model = Pretrain.load_from_checkpoint(
+            "pretrain/epoch=965-step=972761.ckpt")
         self.atom_embedding = pretrain_model.atom_embedding
         self.position_embedding = pretrain_model.position_embedding
         self.lattice_embedding = pretrain_model.lattice_embedding
         self.encoder = pretrain_model.encoder
-        self.readout = ff_output(input_dim=64,output_dim=25)
+        self.readout = ff_output(input_dim=64, output_dim=25)
+
     @staticmethod
     def Gassian_expand(value_list, min_value, max_value, intervals, expand_width, device):
         value_list = value_list.expand(-1, -1, intervals)
         centers = torch.linspace(min_value, max_value, intervals).to(device)
         result = torch.exp(-(value_list - centers)**2/expand_width**2)
         return result
+
     def shared_procedure(self, batch):
         encoded_graph, _ = batch
         # atoms: (batch_size,max_atoms,31)
@@ -53,6 +56,8 @@ class Experiment(pl.LightningModule):
         FIE = encoded_graph["FIE"]
         # (batch_size, max_atoms, 1)
         elecaffi = encoded_graph["elecaffi"]
+        # (batch_size, max_atoms, 1)
+        atmwht = encoded_graph["AM"]
         # (batch_size, max_atoms, 3)
         positions = encoded_graph["positions"]
 
@@ -66,8 +71,11 @@ class Experiment(pl.LightningModule):
         FIE = self.Gassian_expand(FIE, 3, 25, 20, 1.15, device)
         # (batch_size, max_atoms, 20)
         elecaffi = self.Gassian_expand(elecaffi, -3, 3.7, 20, 0.34, device)
+        # (batch_size, max_atoms, 20)
+        atmwht = self.Gassian_expand(atmwht, 0, 210, 20, 10.5, device)
         # (batch_size, max_atoms, 111)
-        atoms = torch.cat((atoms, elecneg, covrad, FIE, elecaffi), dim=2)
+        atoms = torch.cat(
+            (atoms, elecneg, covrad, FIE, elecaffi, atmwht), dim=2)
 
         positions = positions.unsqueeze(dim=3).expand(-1, -1, 3, 20)
         centers = torch.linspace(-15, 18, 20).to(device)
@@ -115,48 +123,51 @@ class Experiment(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         _, ramans = batch
         predicted_spectrum = self.shared_procedure(batch)
-        loss = F.l1_loss(predicted_spectrum, ramans,reduction="none")
+        loss = F.l1_loss(predicted_spectrum, ramans, reduction="none")
         self.log("train_loss", loss.mean(), on_epoch=True, on_step=False)
-        loss_weight = F.softmax(ramans,dim=1)
-        loss_weighed = torch.sum(loss*loss_weight,dim=1).mean()
-        self.log("train_loss_weighed", loss_weighed, on_epoch=True, on_step=False)
+        loss_weight = F.softmax(ramans, dim=1)
+        loss_weighed = torch.sum(loss*loss_weight, dim=1).mean()
+        self.log("train_loss_weighed", loss_weighed,
+                 on_epoch=True, on_step=False)
         spectrum_round = torch.round(predicted_spectrum)
-        loss_round = F.l1_loss(spectrum_round,ramans)
-        self.log("train_loss_round",loss_round,on_epoch=True,on_step=False)
+        loss_round = F.l1_loss(spectrum_round, ramans)
+        self.log("train_loss_round", loss_round, on_epoch=True, on_step=False)
         similarity = F.cosine_similarity(
             predicted_spectrum, ramans).mean()
         self.log("train_simi", similarity, on_epoch=True, on_step=False)
-        Hamming = torch.eq(spectrum_round,ramans).float().mean()
+        Hamming = torch.eq(spectrum_round, ramans).float().mean()
         self.log("train_hamming", Hamming, on_epoch=True, on_step=False)
-        return loss.mean()+(1-similarity)*8
+        return loss.mean()+(1-similarity)*4
+
     def validation_step(self, batch, batch_idx):
         _, ramans = batch
         predicted_spectrum = self.shared_procedure(batch)
-        loss = F.l1_loss(predicted_spectrum, ramans,reduction="none")
+        loss = F.l1_loss(predicted_spectrum, ramans, reduction="none")
         self.log("val_loss", loss.mean(), on_epoch=True, on_step=False)
-        loss_weight = F.softmax(ramans,dim=1)
-        loss_weighed = torch.sum(loss*loss_weight,dim=1).mean()
-        self.log("val_loss_weighed", loss_weighed, on_epoch=True, on_step=False)
+        loss_weight = F.softmax(ramans, dim=1)
+        loss_weighed = torch.sum(loss*loss_weight, dim=1).mean()
+        self.log("val_loss_weighed", loss_weighed,
+                 on_epoch=True, on_step=False)
         spectrum_round = torch.round(predicted_spectrum)
-        loss_round = F.l1_loss(spectrum_round,ramans)
-        self.log("val_loss_round",loss_round,on_epoch=True,on_step=False)
+        loss_round = F.l1_loss(spectrum_round, ramans)
+        self.log("val_loss_round", loss_round, on_epoch=True, on_step=False)
         similarity = F.cosine_similarity(
             predicted_spectrum, ramans).mean()
         self.log("val_simi", similarity, on_epoch=True, on_step=False)
-        Hamming = torch.eq(spectrum_round,ramans).float().mean()
+        Hamming = torch.eq(spectrum_round, ramans).float().mean()
         self.log("val_hamming", Hamming, on_epoch=True, on_step=False)
-        return loss.mean()+(1-similarity)*8
+        return loss.mean()+(1-similarity)*4
 
     def configure_optimizers(self):
         if self.hparams.optim_type == "AdamW":
-            optimizer = torch.optim.AdamW(self.parameters(), lr=self.lr,weight_decay=self.hparams.weight_decay)
+            optimizer = torch.optim.AdamW(
+                self.parameters(), lr=self.lr, weight_decay=self.hparams.weight_decay)
         else:
-            optimizer = torch.optim.Adam(self.parameters(), lr=self.lr,weight_decay=self.hparams.weight_decay)
-        schedualer = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=64)
-        return [optimizer],[schedualer]
-
-
-
+            optimizer = torch.optim.Adam(
+                self.parameters(), lr=self.lr, weight_decay=self.hparams.weight_decay)
+        schedualer = torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer, T_max=64)
+        return [optimizer], [schedualer]
 
 
 def model_config(config):
@@ -185,11 +196,9 @@ def model_config(config):
     return params
 
 
-
-
-
-if __name__=="__main__":
-    parser = argparse.ArgumentParser(description="Select a train_config.yaml file")
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Select a train_config.yaml file")
     parser.add_argument(dest="filename", metavar="/path/to/file")
     arg = parser.parse_args()
     path_to_file = arg.filename
@@ -201,8 +210,7 @@ if __name__=="__main__":
         monitor='val_simi',
         save_top_k=3,
         mode='max',
-    )    
-
+    )
 
     train_set = torch.load("materials/JVASP/Train_raman_set.pt")
     validate_set = torch.load("materials/JVASP/Valid_raman_set.pt")
@@ -217,8 +225,7 @@ if __name__=="__main__":
     except KeyError:
         model_hpparams = model_config(config)
         print(model_hpparams)
-        experiment = Experiment(**model_hpparams)    
-
+        experiment = Experiment(**model_hpparams)
 
     trainer_config = config["trainer"]
     logger = TensorBoardLogger(prefix)
