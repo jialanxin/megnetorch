@@ -17,7 +17,7 @@ class Experiment(pl.LightningModule):
         self.save_hyperparameters()
         self.lr = lr
         pretrain_model = Finetune.load_from_checkpoint(
-            "pretrain/finetuned/epoch=552-step=62488.ckpt")
+            "pretrain/finetuned/epoch=3177-step=359113.ckpt")
         self.atom_embedding = pretrain_model.atom_embedding
         self.position_embedding = pretrain_model.position_embedding
         self.lattice_embedding = pretrain_model.lattice_embedding
@@ -158,14 +158,26 @@ if __name__ == "__main__":
     print(m)
 
 
-# Train:
+# Train:  loss+4simi                                                       
+# label\predict:          0,          1,          2,                       
+# 0,               9.7021e-01, 2.8971e-02, 7.7503e-04,                     
+# 1,               2.7765e-01, 6.3664e-01, 8.1494e-02,                     
+# 2,               2.7521e-01, 6.3836e-01, 8.2242e-02                      
+
+# Train:  loss_weight_e
 # label\predict:          0,          1,          2,
-# 0,               9.7021e-01, 2.8971e-02, 7.7503e-04,
-# 1,               2.7765e-01, 6.3664e-01, 8.1494e-02,
-# 2,               2.7521e-01, 6.3836e-01, 8.2242e-02
+# 0,                 0.8955,     0.0620,     0.0256
+# 1,                 0.2277,     0.5963,     0.1192,
+# 2,                 0.2257,     0.5918,     0.1255,
 
 # Validate:
 # label\predict:          0,          1,          2,
 # 0,                   0.9354,     0.0557,     0.0077,
 # 1,                   0.4340,     0.4462,     0.1007,
 # 2,                   0.4307,     0.4495,     0.1003
+
+# Validate:
+# label\predict:            0,      1,      2,
+# 0,                   0.8736, 0.0756, 0.0318
+# 1,                   0.3053, 0.4228, 0.1872,
+# 2,                   0.2981, 0.4083, 0.2023
