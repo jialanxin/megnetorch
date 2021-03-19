@@ -1,5 +1,5 @@
 prefix:
-  "/home/jlx/v0.4.4/15.finetune_loss_weight_4_sign/"
+  "/home/jlx/v0.4.4/17.finetune_loss_weight_2_sign/"
 trainer: "fit"
 optimizer:
         lr: 5e-4
