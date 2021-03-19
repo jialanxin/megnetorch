@@ -17,7 +17,7 @@ class Experiment(pl.LightningModule):
         self.save_hyperparameters()
         self.lr = lr
         pretrain_model = Finetune.load_from_checkpoint(
-            "pretrain/finetuned/epoch=3679-step=415839.ckpt")
+            "pretrain/finetuned/epoch=3888-step=439456.ckpt")
         self.atom_embedding = pretrain_model.atom_embedding
         self.position_embedding = pretrain_model.position_embedding
         self.lattice_embedding = pretrain_model.lattice_embedding
@@ -159,49 +159,67 @@ if __name__ == "__main__":
 
 
 # Train:  loss+4simi                                                       
-# label\predict:          0,          1,          2,                       
-# 0,               9.7021e-01, 2.8971e-02, 7.7503e-04,                     
-# 1,               2.7765e-01, 6.3664e-01, 8.1494e-02,                     
-# 2,               2.7521e-01, 6.3836e-01, 8.2242e-02                      
+# label\predict:          0,       1,      2,                       
+# 0,                 0.9702,  0.0289, 0.0007,                     
+# 1,                 0.2776,  0.6366, 0.0881,                     
+# 2,                 0.2752,  0.6383, 0.0822      
+# Validate:
+# label\predict:          0,          1,          2,
+# 0,                   0.9354,     0.0557,     0.0077,
+# 1,                   0.4340,     0.4462,     0.1007,
+# 2,                   0.4307,     0.4495,     0.1003                
 
 # Train:  loss_weight_e
 # label\predict:          0,          1,          2,
 # 0,                 0.8955,     0.0620,     0.0256
 # 1,                 0.2277,     0.5963,     0.1192,
 # 2,                 0.2257,     0.5918,     0.1255,
-
-# Train:  loss_weight_1.5
-# label\predict:          0,      1,      2,
-# 0,                 0.9697, 0.0229, 0.0069
-# 1,                 0.3431, 0.5947, 0.0582
-# 2,                 0.3431, 0.5902, 0.0628,
-
-# Train:  loss_weight_e_sign
-# label\predict:          0,      1,      2,
-# 0,                 0.9570, 0.0412, 0.0017
-# 1,                 0.1443, 0.8297, 0.0256
-# 2,                 0.1460, 0.8246, 0.0290
-
-# Validate:
-# label\predict:          0,          1,          2,
-# 0,                   0.9354,     0.0557,     0.0077,
-# 1,                   0.4340,     0.4462,     0.1007,
-# 2,                   0.4307,     0.4495,     0.1003
-
 # Validate:
 # label\predict:            0,      1,      2,
 # 0,                   0.8736, 0.0756, 0.0318
 # 1,                   0.3053, 0.4228, 0.1872,
 # 2,                   0.2981, 0.4083, 0.2023
 
+# Train:  loss_weight_1.5
+# label\predict:          0,      1,      2,
+# 0,                 0.9697, 0.0229, 0.0069
+# 1,                 0.3431, 0.5947, 0.0582
+# 2,                 0.3431, 0.5902, 0.0628,
 # Validate:
 # label\predict:            0,      1,      2,
 # 0,                   0.9417, 0.0395, 0.0149
 # 1,                   0.4590, 0.3988, 0.1043,
 # 2,                   0.4541, 0.3873, 0.1187
 
+# Train:  loss_weight_e_sign
+# label\predict:          0,      1,      2,
+# 0,                 0.9570, 0.0412, 0.0017
+# 1,                 0.1443, 0.8297, 0.0256
+# 2,                 0.1460, 0.8246, 0.0290
 # Validate:
 # label\predict:            0,      1,      2,
 # 0,                   0.9165, 0.0696, 0.0112
 # 1,                   0.3248, 0.5555, 0.0900
 # 2,                   0.3238, 0.5446, 0.0963
+
+# Train:  loss_weight_4_sign
+# label\predict:          0,      1,      2,
+# 0,                 0.9253, 0.0710, 0.0034
+# 1,                 0.1007, 0.8771, 0.0219
+# 2,                 0.1027, 0.8694, 0.0275
+# Validate:
+# label\predict:            0,      1,      2,
+# 0,                   0.8889, 0.0968, 0.0116
+# 1,                   0.2411, 0.6361, 0.0954
+# 2,                   0.2439, 0.6171, 0.1088
+
+# Train:  loss_weight_3_sign
+# label\predict:          0,      1,      2,
+# 0,                 0.9537, 0.0445, 0.0017
+# 1,                 0.1383, 0.8405, 0.0210
+# 2,                 0.1371, 0.8382, 0.0244
+# Validate:
+# label\predict:            0,      1,      2,
+# 0,                   0.9153, 0.0726, 0.0095
+# 1,                   0.3295, 0.5409, 0.1000
+# 2,                   0.3268, 0.5204, 0.1131
