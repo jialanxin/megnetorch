@@ -17,7 +17,7 @@ class Experiment(pl.LightningModule):
         self.save_hyperparameters()
         self.lr = lr
         pretrain_model = Finetune.load_from_checkpoint(
-            "pretrain/finetuned/epoch=3888-step=439456.ckpt")
+            "pretrain/finetuned/epoch=3940-step=445332.ckpt")
         self.atom_embedding = pretrain_model.atom_embedding
         self.position_embedding = pretrain_model.position_embedding
         self.lattice_embedding = pretrain_model.lattice_embedding
@@ -122,7 +122,7 @@ if __name__ == "__main__":
     validate_dataloader = DataLoader(
         dataset=validate_set, batch_size=64, num_workers=1)
     model = Experiment()
-    for i,data in enumerate(validate_dataloader):
+    for i,data in enumerate(train_dataloader):
         _,raman = data
         predicted_spectrum =  model(data)
         where_zero = torch.eq(raman,torch.zeros_like(raman))
@@ -223,3 +223,25 @@ if __name__ == "__main__":
 # 0,                   0.9153, 0.0726, 0.0095
 # 1,                   0.3295, 0.5409, 0.1000
 # 2,                   0.3268, 0.5204, 0.1131
+
+# Train:  loss_weight_1_sign_pure_l1loss
+# label\predict:          0,      1,      2,
+# 0,                 0.9867, 0.0131, 0.0000
+# 1,                 0.3077, 0.6683, 0.0235
+# 2,                 0.3087, 0.6632, 0.0277
+# Validate:
+# label\predict:            0,      1,      2,
+# 0,                   0.9542, 0.0377, 0.0061
+# 1,                   0.4974, 0.3980, 0.0774
+# 2,                   0.4961, 0.3835, 0.0905
+
+# Train:  loss_weight_5_sign
+# label\predict:          0,      1,      2,
+# 0,                 0.9069, 0.0873, 0.0054
+# 1,                 0.0744, 0.9013, 0.0239
+# 2,                 0.0738, 0.8955, 0.0302
+# Validate:
+# label\predict:            0,      1,      2,
+# 0,                   0.8719, 0.1107, 0.0143
+# 1,                   0.1977, 0.6565, 0.1183
+# 2,                   0.1972, 0.6393, 0.1288
