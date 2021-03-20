@@ -1,5 +1,5 @@
 prefix:
-  "/home/jlx/v0.4.4/20.finetune_batch_128/"
+  "/home/jlx/v0.4.4/20.finetune_batch_256/"
 trainer: "fit"
 optimizer:
         lr: 5e-4
