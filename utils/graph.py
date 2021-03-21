@@ -298,7 +298,11 @@ class CrystalEmbedding(CrystalGraph):
             self.get_atomic_weight).reshape((-1, 1))
         atomic_weight_padded = torch.cat((atomic_weight, padding), dim=0)
 
+        atomic_number = torch.LongTensor(self.atomic_numbers) # (num_atoms,)
+        atomic_number_padding = torch.zeros((self.max_atoms-self.num_atoms,),dtype=torch.long) # (max_atoms-num_atoms,)
+        atomic_number_padded = torch.cat((atomic_number,atomic_number_padding)) # (max_atoms,)
+
         lattice = torch.FloatTensor(
             self.structure.lattice.matrix).reshape(-1, 1)  # (9, 1)
 
-        return {"atoms": atoms_padded, "elecneg": elecneg_padded, "covrad": covrad_padded, "FIE": FIE_padded, "elecaffi": elecaffi_padded, "AM": atomic_weight_padded, "positions": positions_padded, "padding_mask": self.padding, "lattice": lattice}
+        return {"atoms": atoms_padded, "elecneg": elecneg_padded, "covrad": covrad_padded, "FIE": FIE_padded, "elecaffi": elecaffi_padded, "AM": atomic_weight_padded, "AN":atomic_number_padded, "positions": positions_padded, "padding_mask": self.padding, "lattice": lattice}

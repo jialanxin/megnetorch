@@ -25,6 +25,7 @@ class Experiment(pl.LightningModule):
         self.save_hyperparameters()
         self.lr = lr
         self.atom_embedding = ff(131)
+        self.atomic_number_embedding = torch.nn.Embedding(num_embeddings=95,embedding_dim=64,padding_idx=0)
         self.position_embedding = ff(60)
         self.lattice_embedding = ff(180)
         encode_layer = torch.nn.TransformerEncoderLayer(
@@ -58,6 +59,8 @@ class Experiment(pl.LightningModule):
         elecaffi = encoded_graph["elecaffi"]
         # (batch_size, max_atoms, 1)
         atmwht = encoded_graph["AM"]
+        # (batch_size, max_atoms)
+        atmnb = encoded_graph["AN"]
         # (batch_size, max_atoms, 3)
         positions = encoded_graph["positions"]
 
@@ -87,7 +90,8 @@ class Experiment(pl.LightningModule):
         atoms = self.atom_embedding(atoms)  # (batch_size,max_atoms,atoms_info)
         # (batch_size,max_atoms,positions_info)
         positions = self.position_embedding(positions)
-        atoms = atoms+positions  # (batch_size,max_atoms,atoms_info)
+        atomic_numbers = self.atomic_number_embedding(atmnb)  # (batch_size, max_atoms, atoms_info)
+        atoms = atoms+atomic_numbers+positions  # (batch_size,max_atoms,atoms_info)
 
         lattice = self.Gassian_expand(
             lattice, -15, 18, 20, 1.65, device)  # (batch_size, 9, 20)
@@ -192,9 +196,9 @@ if __name__ == "__main__":
     validate_set = torch.load("./materials/mp/Valid_fmten_set.pt")
 
     train_dataloader = DataLoader(
-        dataset=train_set, batch_size=64, num_workers=4)
+        dataset=train_set, batch_size=128, num_workers=8)
     validate_dataloader = DataLoader(
-        dataset=validate_set, batch_size=64, num_workers=4)
+        dataset=validate_set, batch_size=128, num_workers=8)
 
     checkpoint_callback = ModelCheckpoint(
         monitor='val_loss',
