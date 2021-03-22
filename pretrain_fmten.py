@@ -28,7 +28,7 @@ class Experiment(pl.LightningModule):
         self.atomic_number_embedding = torch.nn.Embedding(
             num_embeddings=95, embedding_dim=64, padding_idx=0)
         self.mendeleev_number_embedding = torch.nn.Embedding(
-            num_embeddings=103, embedding_dim=64, padding_idx=0)
+            num_embeddings=104, embedding_dim=64, padding_idx=0)
         self.position_embedding = ff(60)
         self.lattice_embedding = ff(180)
         encode_layer = torch.nn.TransformerEncoderLayer(
