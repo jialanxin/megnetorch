@@ -11,101 +11,19 @@ from torch.nn import Embedding, RReLU, ReLU, Dropout
 from dataset import StructureRamanDataset
 from finetune import Experiment as Finetune
 
-class Experiment(pl.LightningModule):
+class Experiment(Finetune):
     def __init__(self, num_enc=6, optim_type="Adam", lr=1e-3, weight_decay=0.0):
         super().__init__()
         self.save_hyperparameters()
         self.lr = lr
         pretrain_model = Finetune.load_from_checkpoint(
-            "pretrain/finetuned/epoch=3683-step=106835.ckpt")
+            "pretrain/finetuned/epoch=3720-step=212096.ckpt")
         self.atom_embedding = pretrain_model.atom_embedding
+        self.atomic_number_embedding = pretrain_model.atomic_number_embedding
         self.position_embedding = pretrain_model.position_embedding
         self.lattice_embedding = pretrain_model.lattice_embedding
         self.encoder = pretrain_model.encoder
         self.readout = pretrain_model.readout
-
-    @staticmethod
-    def Gassian_expand(value_list, min_value, max_value, intervals, expand_width, device):
-        value_list = value_list.expand(-1, -1, intervals)
-        centers = torch.linspace(min_value, max_value, intervals).to(device)
-        result = torch.exp(-(value_list - centers)**2/expand_width**2)
-        return result
-
-    def shared_procedure(self, batch):
-        encoded_graph, _ = batch
-        # atoms: (batch_size,max_atoms,31)
-        atoms = encoded_graph["atoms"]
-        # padding_mask: (batch_size, max_atoms)
-        padding_mask = encoded_graph["padding_mask"]
-        # lattice: (batch_size, 9, 1)
-        lattice = encoded_graph["lattice"]
-        # (batch_size, max_atoms, 1)
-        elecneg = encoded_graph["elecneg"]
-        # (batch_size, max_atoms, 1)
-        covrad = encoded_graph["covrad"]
-        # (batch_size, max_atoms, 1)
-        FIE = encoded_graph["FIE"]
-        # (batch_size, max_atoms, 1)
-        elecaffi = encoded_graph["elecaffi"]
-        # (batch_size, max_atoms, 1)
-        atmwht = encoded_graph["AM"]
-        # (batch_size, max_atoms, 3)
-        positions = encoded_graph["positions"]
-
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-        # (batch_size, max_atoms, 20)
-        elecneg = self.Gassian_expand(elecneg, 0.5, 4.0, 20, 0.18, device)
-        # (batch_size, max_atoms, 20)
-        covrad = self.Gassian_expand(covrad, 50, 250, 20, 10, device)
-        # (batch_size, max_atoms, 20)
-        FIE = self.Gassian_expand(FIE, 3, 25, 20, 1.15, device)
-        # (batch_size, max_atoms, 20)
-        elecaffi = self.Gassian_expand(elecaffi, -3, 3.7, 20, 0.34, device)
-        # (batch_size, max_atoms, 20)
-        atmwht = self.Gassian_expand(atmwht, 0, 210, 20, 10.5, device)
-        # (batch_size, max_atoms, 111)
-        atoms = torch.cat(
-            (atoms, elecneg, covrad, FIE, elecaffi, atmwht), dim=2)
-
-        positions = positions.unsqueeze(dim=3).expand(-1, -1, 3, 20)
-        centers = torch.linspace(-15, 18, 20).to(device)
-        # (batch_size, max_atoms, 3, 20)
-        positions = torch.exp(-(positions - centers)**2/1.65**2)
-        # (batch_size, max_atoms, 60)
-        positions = torch.flatten(positions, start_dim=2)
-
-        atoms = self.atom_embedding(atoms)  # (batch_size,max_atoms,atoms_info)
-        # (batch_size,max_atoms,positions_info)
-        positions = self.position_embedding(positions)
-        atoms = atoms+positions  # (batch_size,max_atoms,atoms_info)
-
-        lattice = self.Gassian_expand(
-            lattice, -15, 18, 20, 1.65, device)  # (batch_size, 9, 20)
-        lattice = torch.flatten(lattice, start_dim=1)  # (batch_size,180)
-        lattice = self.lattice_embedding(lattice)  # (batch_size,lacttice_info)
-        # (batch_size,1,lacttice_info)
-        lattice = torch.unsqueeze(lattice, dim=1)
-        # (batch_size,1+max_atoms,atoms_info)
-        atoms = torch.cat((lattice, atoms), dim=1)
-        # (1+max_atoms, batch_size, atoms_info)
-        atoms = torch.transpose(atoms, dim0=0, dim1=1)
-        batch_size = padding_mask.shape[0]
-        cls_padding = torch.zeros((batch_size, 1)).bool().to(
-            device)  # (batch_size, 1)
-
-        # (batch_size, 1+max_atoms)
-        padding_mask = torch.cat((cls_padding, padding_mask), dim=1)
-
-        # (1+max_atoms, batch_size, atoms_info)
-        atoms = self.encoder(src=atoms, src_key_padding_mask=padding_mask)
-
-        system_out = atoms[0]  # (batch_size,atoms_info)
-
-        output_spectrum = self.readout(system_out)  # (batch_size, raman_info)
-        output_spectrum = torch.exp(output_spectrum)
-
-        return output_spectrum
 
     def forward(self, batch):
         predicted_spectrum = self.shared_procedure(batch)
@@ -122,7 +40,7 @@ if __name__ == "__main__":
     validate_dataloader = DataLoader(
         dataset=validate_set, batch_size=64, num_workers=1)
     model = Experiment()
-    for i,data in enumerate(train_dataloader):
+    for i,data in enumerate(validate_dataloader):
         _,raman = data
         predicted_spectrum =  model(data)
         where_zero = torch.eq(raman,torch.zeros_like(raman))
@@ -215,14 +133,14 @@ if __name__ == "__main__":
 
 # Train:  loss_weight_4_sign_batch_128
 # label\predict:          0,      1,      2,
-# 0,                 0.9278, 0.0689, 0.0030
-# 1,                 0.1021, 0.8795, 0.0175
-# 2,                 0.1012, 0.8777, 0.0195
+# 0,                 0.9335, 0.0630, 0.0032
+# 1,                 0.0975, 0.8755, 0.0265
+# 2,                 0.0966, 0.8722, 0.0307
 # Validate:
 # label\predict:            0,      1,      2,
-# 0,                   0.8913, 0.0956, 0.0102
-# 1,                   0.2495, 0.6335, 0.0974
-# 2,                   0.2517, 0.6162, 0.1092
+# 0,                   0.8907, 0.0942, 0.0128
+# 1,                   0.2655, 0.6055, 0.1021
+# 2,                   0.2653, 0.5870, 0.1166
 
 # Train:  loss_weight_4_sign_batch_256
 # label\predict:          0,      1,      2,

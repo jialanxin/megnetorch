@@ -15,6 +15,6 @@ space_group = MoS2_graph.get_raman_mode_numbers()
 padding = MoS2_graph.padding
 positions = MoS2_graph.positions
 atomic_weight = MoS2_graph.get_atomic_weight
+mendeleev_no = MoS2_graph.get_mendeleev_no
 input = MoS2_graph.convert_to_model_input()
-print(input)
 print("end")

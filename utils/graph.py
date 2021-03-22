@@ -263,6 +263,19 @@ class CrystalEmbedding(CrystalGraph):
         atomic_weight = [atom.atomic_mass for atom in self.atoms]
         return atomic_weight
 
+    @property
+    def get_mendeleev_no(self):
+        mendeleev_no = [atom.mendeleev_no for atom in self.atoms]
+        return mendeleev_no
+
+    def process_index_feature_input(self,value_list):
+        atomic_number_like = torch.LongTensor(value_list)  # (num_atoms,)
+        # (max_atoms-num_atoms,)
+        padding = torch.zeros(
+            (self.max_atoms-self.num_atoms,), dtype=torch.long)
+        padded = torch.cat((atomic_number_like, padding))  # (max_atoms,)
+        return padded
+
     def convert_to_model_input(self) -> Dict:
         atoms_fea = torch.cat((self.get_atomic_groups, self.get_atomic_periods,
                                self.get_atomic_blocks), dim=1)  # (num_atoms, 31)
@@ -298,11 +311,13 @@ class CrystalEmbedding(CrystalGraph):
             self.get_atomic_weight).reshape((-1, 1))
         atomic_weight_padded = torch.cat((atomic_weight, padding), dim=0)
 
-        atomic_number = torch.LongTensor(self.atomic_numbers) # (num_atoms,)
-        atomic_number_padding = torch.zeros((self.max_atoms-self.num_atoms,),dtype=torch.long) # (max_atoms-num_atoms,)
-        atomic_number_padded = torch.cat((atomic_number,atomic_number_padding)) # (max_atoms,)
+        atomic_number_padded = self.process_index_feature_input(
+            self.atomic_numbers)  # (max_atoms,)
+
+        mendeleev_no_padded = self.process_index_feature_input(
+            self.get_mendeleev_no)  # (max_atoms,)
 
         lattice = torch.FloatTensor(
             self.structure.lattice.matrix).reshape(-1, 1)  # (9, 1)
 
-        return {"atoms": atoms_padded, "elecneg": elecneg_padded, "covrad": covrad_padded, "FIE": FIE_padded, "elecaffi": elecaffi_padded, "AM": atomic_weight_padded, "AN":atomic_number_padded, "positions": positions_padded, "padding_mask": self.padding, "lattice": lattice}
+        return {"atoms": atoms_padded, "elecneg": elecneg_padded, "covrad": covrad_padded, "FIE": FIE_padded, "elecaffi": elecaffi_padded, "AM": atomic_weight_padded, "AN": atomic_number_padded, "MN": mendeleev_no_padded, "positions": positions_padded, "padding_mask": self.padding, "lattice": lattice}
