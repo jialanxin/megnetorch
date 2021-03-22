@@ -16,5 +16,6 @@ padding = MoS2_graph.padding
 positions = MoS2_graph.positions
 atomic_weight = MoS2_graph.get_atomic_weight
 mendeleev_no = MoS2_graph.get_mendeleev_no
+valence_electron = MoS2_graph.get_valence_electrons
 input = MoS2_graph.convert_to_model_input()
 print("end")
