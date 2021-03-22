@@ -1,5 +1,5 @@
 prefix:
-  "/home/jlx/v0.4.4/22.pretrain_atomic_number_fmten*4/"
+  "/home/jlx/v0.4.4/22.finetune_atomic_number/"
 trainer: "fit"
 optimizer:
         lr: 5e-4

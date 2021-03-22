@@ -26,8 +26,9 @@ class Experiment(pl.LightningModule):
         self.save_hyperparameters()
         self.lr = lr
         pretrain_model = Pretrain.load_from_checkpoint(
-            "pretrain/epoch=965-step=972761.ckpt")
+            "pretrain/epoch=968-step=487406.ckpt")
         self.atom_embedding = pretrain_model.atom_embedding
+        self.atomic_number_embedding = pretrain_model.atomic_number_embedding
         self.position_embedding = pretrain_model.position_embedding
         self.lattice_embedding = pretrain_model.lattice_embedding
         self.encoder = pretrain_model.encoder
@@ -58,6 +59,8 @@ class Experiment(pl.LightningModule):
         elecaffi = encoded_graph["elecaffi"]
         # (batch_size, max_atoms, 1)
         atmwht = encoded_graph["AM"]
+        # (batch_size, max_atoms)
+        atmnb = encoded_graph["AN"]
         # (batch_size, max_atoms, 3)
         positions = encoded_graph["positions"]
 
@@ -87,7 +90,8 @@ class Experiment(pl.LightningModule):
         atoms = self.atom_embedding(atoms)  # (batch_size,max_atoms,atoms_info)
         # (batch_size,max_atoms,positions_info)
         positions = self.position_embedding(positions)
-        atoms = atoms+positions  # (batch_size,max_atoms,atoms_info)
+        atomic_numbers = self.atomic_number_embedding(atmnb)  # (batch_size, max_atoms, atoms_info)
+        atoms = atoms+atomic_numbers+positions  # (batch_size,max_atoms,atoms_info)
 
         lattice = self.Gassian_expand(
             lattice, -15, 18, 20, 1.65, device)  # (batch_size, 9, 20)
