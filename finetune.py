@@ -223,9 +223,9 @@ if __name__ == "__main__":
     train_set = torch.load("materials/JVASP/Train_raman_set.pt")
     validate_set = torch.load("materials/JVASP/Valid_raman_set.pt")
     train_dataloader = DataLoader(
-        dataset=train_set, batch_size=256, num_workers=6, shuffle=True)
+        dataset=train_set, batch_size=128, num_workers=8, shuffle=True)
     validate_dataloader = DataLoader(
-        dataset=validate_set, batch_size=256, num_workers=6)
+        dataset=validate_set, batch_size=128, num_workers=8)
 
     try:
         path = config["checkpoint"]
