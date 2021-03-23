@@ -300,7 +300,7 @@ class CrystalEmbedding(CrystalGraph):
         return padded
     def get_space_group_number(self):
         space_group_number = self.structure.get_space_group_info()[1]
-        space_group_number = torch.LongTensor([[space_group_number]]) #(1,1)
+        space_group_number = torch.LongTensor([space_group_number]) #(1,)
         return space_group_number
 
     def convert_to_model_input(self) -> Dict:

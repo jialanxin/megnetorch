@@ -111,7 +111,7 @@ class Experiment(pl.LightningModule):
         # (batch_size,1,lacttice_info)
         lattice = torch.unsqueeze(lattice, dim=1)
 
-        space_group_number = encoded_graph["SGN"]  # (batch_size,1,1)
+        space_group_number = encoded_graph["SGN"]  # (batch_size,1)
         sgn = self.space_group_number_embedding(
             space_group_number)  # (batch_size, 1,lattice_info)
         lattice = lattice+sgn
