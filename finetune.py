@@ -26,9 +26,10 @@ class Experiment(pl.LightningModule):
         self.save_hyperparameters()
         self.lr = lr
         pretrain_model = Pretrain.load_from_checkpoint(
-            "pretrain/epoch=968-step=487406.ckpt")
+            "pretrain/epoch=964-step=486359.ckpt")
         self.atom_embedding = pretrain_model.atom_embedding
         self.atomic_number_embedding = pretrain_model.atomic_number_embedding
+        self.mendeleev_number_embedding = pretrain_model.mendeleev_number_embedding
         self.position_embedding = pretrain_model.position_embedding
         self.lattice_embedding = pretrain_model.lattice_embedding
         self.encoder = pretrain_model.encoder
@@ -59,8 +60,6 @@ class Experiment(pl.LightningModule):
         elecaffi = encoded_graph["elecaffi"]
         # (batch_size, max_atoms, 1)
         atmwht = encoded_graph["AM"]
-        # (batch_size, max_atoms)
-        atmnb = encoded_graph["AN"]
         # (batch_size, max_atoms, 3)
         positions = encoded_graph["positions"]
 
@@ -90,8 +89,14 @@ class Experiment(pl.LightningModule):
         atoms = self.atom_embedding(atoms)  # (batch_size,max_atoms,atoms_info)
         # (batch_size,max_atoms,positions_info)
         positions = self.position_embedding(positions)
-        atomic_numbers = self.atomic_number_embedding(atmnb)  # (batch_size, max_atoms, atoms_info)
-        atoms = atoms+atomic_numbers+positions  # (batch_size,max_atoms,atoms_info)
+        atmnb = encoded_graph["AN"]  # (batch_size, max_atoms)
+        atomic_numbers = self.atomic_number_embedding(atmnb)
+
+        mennb = encoded_graph["MN"]  # (batch_size, max_atoms)
+        mendeleev_numbers = self.mendeleev_number_embedding(
+            mennb)  # (batch_size, max_atoms, atoms_info)
+        atoms = atoms+atomic_numbers+mendeleev_numbers + \
+            positions  # (batch_size,max_atoms,atoms_info)
 
         lattice = self.Gassian_expand(
             lattice, -15, 18, 20, 1.65, device)  # (batch_size, 9, 20)
@@ -129,8 +134,8 @@ class Experiment(pl.LightningModule):
         predicted_spectrum = self.shared_procedure(batch)
         loss = F.l1_loss(predicted_spectrum, ramans, reduction="none")
         self.log("train_loss", loss.mean(), on_epoch=True, on_step=False)
-        loss_weight = torch.pow(4,torch.sign(ramans))
-        weight_sum = loss_weight.sum(dim=1,keepdim=True)
+        loss_weight = torch.pow(4, torch.sign(ramans))
+        weight_sum = loss_weight.sum(dim=1, keepdim=True)
         loss_weight = loss_weight/weight_sum
         loss_weighed = torch.sum(loss*loss_weight, dim=1).mean()
         self.log("train_loss_weighed", loss_weighed,
@@ -150,8 +155,8 @@ class Experiment(pl.LightningModule):
         predicted_spectrum = self.shared_procedure(batch)
         loss = F.l1_loss(predicted_spectrum, ramans, reduction="none")
         self.log("val_loss", loss.mean(), on_epoch=True, on_step=False)
-        loss_weight = torch.pow(4,torch.sign(ramans))
-        weight_sum = loss_weight.sum(dim=1,keepdim=True)
+        loss_weight = torch.pow(4, torch.sign(ramans))
+        weight_sum = loss_weight.sum(dim=1, keepdim=True)
         loss_weight = loss_weight/weight_sum
         loss_weighed = torch.sum(loss*loss_weight, dim=1).mean()
         self.log("val_loss_weighed", loss_weighed,
@@ -215,7 +220,7 @@ if __name__ == "__main__":
     prefix = config["prefix"]
 
     checkpoint_callback = ModelCheckpoint(
-        monitor='val_simi',
+        monitor='val_hamming',
         save_top_k=3,
         mode='max',
     )
