@@ -26,7 +26,7 @@ class Experiment(pl.LightningModule):
         self.save_hyperparameters()
         self.lr = lr
         pretrain_model = Pretrain.load_from_checkpoint(
-            "pretrain/epoch=964-step=486359.ckpt")
+            "pretrain/epoch=963-step=485855.ckpt")
         self.atom_embedding = pretrain_model.atom_embedding
         self.atomic_number_embedding = pretrain_model.atomic_number_embedding
         self.mendeleev_number_embedding = pretrain_model.mendeleev_number_embedding
@@ -44,7 +44,7 @@ class Experiment(pl.LightningModule):
 
     def shared_procedure(self, batch):
         encoded_graph, _ = batch
-        # atoms: (batch_size,max_atoms,31)
+        # atoms: (batch_size,max_atoms,59)
         atoms = encoded_graph["atoms"]
         # padding_mask: (batch_size, max_atoms)
         padding_mask = encoded_graph["padding_mask"]
@@ -75,7 +75,7 @@ class Experiment(pl.LightningModule):
         elecaffi = self.Gassian_expand(elecaffi, -3, 3.7, 20, 0.34, device)
         # (batch_size, max_atoms, 20)
         atmwht = self.Gassian_expand(atmwht, 0, 210, 20, 10.5, device)
-        # (batch_size, max_atoms, 111)
+        # (batch_size, max_atoms, 159)
         atoms = torch.cat(
             (atoms, elecneg, covrad, FIE, elecaffi, atmwht), dim=2)
 

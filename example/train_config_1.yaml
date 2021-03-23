@@ -1,5 +1,5 @@
 prefix:
-  "/home/jlx/v0.4.4/25.finetune_mendeleev_number/"
+  "/home/jlx/v0.4.4/27.finetune_valence_electrons/"
 trainer: "fit"
 optimizer:
         lr: 5e-4
