@@ -1,5 +1,5 @@
 prefix:
-  "/home/jlx/v0.4.4/23.finetune_atomic_number_batch_128/"
+  "/home/jlx/v0.4.4/26.pretrain_valence_electrons/"
 trainer: "fit"
 optimizer:
         lr: 5e-4
