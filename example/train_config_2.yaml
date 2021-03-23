@@ -1,5 +1,5 @@
 prefix:
-  "/home/jlx/v0.4.4/26.pretrain_valence_electrons/"
+  "/home/jlx/v0.4.4/28.pretrain_space_group_number/"
 trainer: "fit"
 optimizer:
         lr: 5e-4
