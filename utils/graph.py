@@ -267,6 +267,29 @@ class CrystalEmbedding(CrystalGraph):
     def get_mendeleev_no(self):
         mendeleev_no = [atom.mendeleev_no for atom in self.atoms]
         return mendeleev_no
+    @property
+    def get_valence_electrons(self):
+        patterm = re.compile(r"\d+[spdf]\d+")
+        num_atoms = self.num_atoms
+        encoded_valence_electron_number = torch.zeros(
+            (num_atoms, 32), dtype=torch.float)
+        for i, atom in enumerate(self.atoms):
+            electronic_structure = atom.electronic_structure
+            valence_structure = patterm.findall(electronic_structure)
+            for orbit in valence_structure:
+                if "s" in orbit:
+                    s = int(orbit[2:])
+                    encoded_valence_electron_number[i,s-1] += 1
+                if "p" in orbit:
+                    p = int(orbit[2:])
+                    encoded_valence_electron_number[i,2+p-1] += 1
+                if "d" in orbit:
+                    d = int(orbit[2:])
+                    encoded_valence_electron_number[i,8+d-1] += 1
+                if "f" in orbit:
+                    f = int(orbit[2:])
+                    encoded_valence_electron_number[i,18+f-1] += 1
+        return encoded_valence_electron_number
 
     def process_index_feature_input(self,value_list):
         atomic_number_like = torch.LongTensor(value_list)  # (num_atoms,)
@@ -278,7 +301,7 @@ class CrystalEmbedding(CrystalGraph):
 
     def convert_to_model_input(self) -> Dict:
         atoms_fea = torch.cat((self.get_atomic_groups, self.get_atomic_periods,
-                               self.get_atomic_blocks), dim=1)  # (num_atoms, 31)
+                               self.get_valence_electrons), dim=1)  # (num_atoms, 59)
         embedding_dim = atoms_fea.shape[1]
         atoms_padding = torch.zeros(
             (self.max_atoms-self.num_atoms, embedding_dim))
