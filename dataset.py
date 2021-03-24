@@ -78,6 +78,26 @@ class StructureFmtEnDataset(Dataset):
     def __len__(self) -> int:
         return len(self.data_info)
 
+class StructureSpaceGroupDataset(StructureFmtEnDataset):
+    @staticmethod
+    def get_input(data):
+        couples = []
+        for item in data:
+            structure = Structure.from_dict(item["structure"])
+            try:
+                fmt_en = torch.FloatTensor([item["formation_energy_per_atom"]])
+                graph = CrystalEmbedding(structure,max_atoms=30)
+            except ValueError:
+                continue
+            except RuntimeError:
+                continue
+            except TypeError:
+                continue
+            encoded_graph = graph.convert_to_model_input()
+            space_group_number = encoded_graph["SGN"]
+            couples.append((encoded_graph,space_group_number))
+        return couples
+
 class StructureRamanModesDataset(Dataset):
     @staticmethod
     def get_input(data):
@@ -104,14 +124,14 @@ class StructureRamanModesDataset(Dataset):
 def prepare_datesets(json_file):
     with open(json_file, "r") as f:
         data = json.loads(f.read())
-    dataset = StructureFmtEnDataset(data)
+    dataset = StructureSpaceGroupDataset(data)
     return dataset
 
 if __name__=="__main__":
     train_set = prepare_datesets("materials/mp/Train_data.json")
     print(len(train_set))
-    torch.save(train_set,"materials/mp/Train_fmten_set.pt")
+    torch.save(train_set,"materials/mp/Train_spgp_set.pt")
 
     validate_set = prepare_datesets("materials/mp/Valid_data.json")
     print(len(validate_set))
-    torch.save(validate_set,"materials/mp/Valid_fmten_set.pt")
+    torch.save(validate_set,"materials/mp/Valid_spgp_set.pt")
