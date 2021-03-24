@@ -17,5 +17,6 @@ atomic_weight = MoS2_graph.get_atomic_weight
 mendeleev_no = MoS2_graph.get_mendeleev_no
 valence_electron = MoS2_graph.get_valence_electrons
 space_group = MoS2_graph.get_space_group_number()
+cell_volume = MoS2_graph.get_cell_volume()
 input = MoS2_graph.convert_to_model_input()
 print("end")

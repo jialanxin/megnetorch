@@ -302,6 +302,9 @@ class CrystalEmbedding(CrystalGraph):
         space_group_number = self.structure.get_space_group_info()[1]
         space_group_number = torch.LongTensor([space_group_number]) #(1,)
         return space_group_number
+    def get_cell_volume(self):
+        cell_volume = torch.FloatTensor([self.structure.volume])
+        return cell_volume
 
     def convert_to_model_input(self) -> Dict:
         atoms_fea = torch.cat((self.get_atomic_groups, self.get_atomic_periods,
@@ -349,4 +352,6 @@ class CrystalEmbedding(CrystalGraph):
 
         space_group_number = self.get_space_group_number()
 
-        return {"atoms": atoms_padded, "elecneg": elecneg_padded, "covrad": covrad_padded, "FIE": FIE_padded, "elecaffi": elecaffi_padded, "AM": atomic_weight_padded, "AN": atomic_number_padded, "MN": mendeleev_no_padded, "positions": positions_padded, "padding_mask": self.padding, "lattice": lattice,"SGN":space_group_number}
+        cell_volume = self.get_cell_volume()
+
+        return {"atoms": atoms_padded, "elecneg": elecneg_padded, "covrad": covrad_padded, "FIE": FIE_padded, "elecaffi": elecaffi_padded, "AM": atomic_weight_padded, "AN": atomic_number_padded, "MN": mendeleev_no_padded, "positions": positions_padded, "padding_mask": self.padding, "lattice": lattice,"SGN":space_group_number,"CV":cell_volume}
