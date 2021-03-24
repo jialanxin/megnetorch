@@ -17,11 +17,12 @@ class Experiment(Finetune):
         self.save_hyperparameters()
         self.lr = lr
         pretrain_model = Finetune.load_from_checkpoint(
-            "pretrain/finetuned/epoch=3455-step=196991.ckpt")
+            "pretrain/finetuned/epoch=3805-step=216941.ckpt")
         self.atom_embedding = pretrain_model.atom_embedding
         self.atomic_number_embedding = pretrain_model.atomic_number_embedding
         self.mendeleev_number_embedding = pretrain_model.mendeleev_number_embedding
         self.position_embedding = pretrain_model.position_embedding
+        self.space_group_number_embedding = pretrain_model.space_group_number_embedding
         self.lattice_embedding = pretrain_model.lattice_embedding
         self.encoder = pretrain_model.encoder
         self.readout = pretrain_model.readout
@@ -41,7 +42,7 @@ if __name__ == "__main__":
     validate_dataloader = DataLoader(
         dataset=validate_set, batch_size=64, num_workers=1)
     model = Experiment()
-    for i,data in enumerate(validate_dataloader):
+    for i,data in enumerate(train_dataloader):
         _,raman = data
         predicted_spectrum =  model(data)
         where_zero = torch.eq(raman,torch.zeros_like(raman))
@@ -123,14 +124,14 @@ if __name__ == "__main__":
 
 # Train:  loss_weight_4_sign
 # label\predict:          0,      1,      2,
-# 0,                 0.9253, 0.0710, 0.0034
-# 1,                 0.1007, 0.8771, 0.0219
-# 2,                 0.1027, 0.8694, 0.0275
+# 0,                 0.9416, 0.0554, 0.0027
+# 1,                 0.0942, 0.8888, 0.0167
+# 2,                 0.0941, 0.8832, 0.0217
 # Validate:
 # label\predict:            0,      1,      2,
-# 0,                   0.8889, 0.0968, 0.0116
-# 1,                   0.2411, 0.6361, 0.0954
-# 2,                   0.2439, 0.6171, 0.1088
+# 0,                   0.9008, 0.0857, 0.0111
+# 1,                   0.2822, 0.5999, 0.0995
+# 2,                   0.2824, 0.5833, 0.1111
 
 # Train:  loss_weight_4_sign_batch_128
 # label\predict:          0,      1,      2,
