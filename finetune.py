@@ -26,9 +26,10 @@ class Experiment(pl.LightningModule):
         self.save_hyperparameters()
         self.lr = lr
         pretrain_model = Pretrain.load_from_checkpoint(
-            "pretrain/epoch=963-step=485855.ckpt")
+            "pretrain/epoch=966-step=487367.ckpt")
         self.atom_embedding = pretrain_model.atom_embedding
         self.atomic_number_embedding = pretrain_model.atomic_number_embedding
+        self.space_group_number_embedding = pretrain_model.space_group_number_embedding
         self.mendeleev_number_embedding = pretrain_model.mendeleev_number_embedding
         self.position_embedding = pretrain_model.position_embedding
         self.lattice_embedding = pretrain_model.lattice_embedding
@@ -98,12 +99,19 @@ class Experiment(pl.LightningModule):
         atoms = atoms+atomic_numbers+mendeleev_numbers + \
             positions  # (batch_size,max_atoms,atoms_info)
 
+        lattice = encoded_graph["lattice"]  # lattice: (batch_size, 9, 1)
         lattice = self.Gassian_expand(
             lattice, -15, 18, 20, 1.65, device)  # (batch_size, 9, 20)
         lattice = torch.flatten(lattice, start_dim=1)  # (batch_size,180)
         lattice = self.lattice_embedding(lattice)  # (batch_size,lacttice_info)
         # (batch_size,1,lacttice_info)
         lattice = torch.unsqueeze(lattice, dim=1)
+
+        space_group_number = encoded_graph["SGN"]  # (batch_size,1)
+        sgn = self.space_group_number_embedding(
+            space_group_number)  # (batch_size, 1,lattice_info)
+        lattice = lattice+sgn
+
         # (batch_size,1+max_atoms,atoms_info)
         atoms = torch.cat((lattice, atoms), dim=1)
         # (1+max_atoms, batch_size, atoms_info)
