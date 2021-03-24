@@ -32,7 +32,7 @@ class Experiment(pl.LightningModule):
         self.space_group_number_embedding = torch.nn.Embedding(
             num_embeddings=230, embedding_dim=64)
         self.position_embedding = ff(60)
-        self.lattice_embedding = ff(180)
+        self.lattice_embedding = ff(200)
         encode_layer = torch.nn.TransformerEncoderLayer(
             d_model=64, nhead=8, dim_feedforward=256)
         self.encoder = torch.nn.TransformerEncoder(
@@ -107,9 +107,14 @@ class Experiment(pl.LightningModule):
         lattice = self.Gassian_expand(
             lattice, -15, 18, 20, 1.65, device)  # (batch_size, 9, 20)
         lattice = torch.flatten(lattice, start_dim=1)  # (batch_size,180)
+
+        cell_volume = torch.log(encoded_graph["CV"])   # lattice: (batch_size,1,1)
+        cell_volume = self.Gassian_expand(cell_volume,3,8,20,0.25,device) # (batch_size,1,20)
+        cell_volume = torch.flatten(cell_volume,start_dim=1) # (batch_size, 20)
+
+        lattice = torch.cat((lattice,cell_volume),dim=1) # (batch_size, 200)
         lattice = self.lattice_embedding(lattice)  # (batch_size,lacttice_info)
-        # (batch_size,1,lacttice_info)
-        lattice = torch.unsqueeze(lattice, dim=1)
+        lattice = torch.unsqueeze(lattice, dim=1)  # (batch_size,1,lacttice_info)
 
         space_group_number = encoded_graph["SGN"]  # (batch_size,1)
         sgn = self.space_group_number_embedding(

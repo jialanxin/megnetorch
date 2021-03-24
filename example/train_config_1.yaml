@@ -1,5 +1,5 @@
 prefix:
-  "/home/jlx/v0.4.4/29.finetune_space_group_number/"
+  "/home/jlx/v0.4.4/30.pretrain_cell_volume/"
 trainer: "fit"
 optimizer:
         lr: 5e-4
