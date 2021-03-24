@@ -177,9 +177,9 @@ if __name__ == "__main__":
         dataset=validate_set, batch_size=128, num_workers=8)
 
     checkpoint_callback = ModelCheckpoint(
-        monitor='val_loss',
+        monitor='val_acc',
         save_top_k=3,
-        mode='min',
+        mode='max',
     )
     try:
         path = config["checkpoint"]
