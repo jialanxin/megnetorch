@@ -298,6 +298,10 @@ class CrystalEmbedding(CrystalGraph):
             (self.max_atoms-self.num_atoms,), dtype=torch.long)
         padded = torch.cat((atomic_number_like, padding))  # (max_atoms,)
         return padded
+    def get_space_group_number(self):
+        space_group_number = self.structure.get_space_group_info()[1]
+        space_group_number = torch.LongTensor([space_group_number]) #(1,)
+        return space_group_number
 
     def convert_to_model_input(self) -> Dict:
         atoms_fea = torch.cat((self.get_atomic_groups, self.get_atomic_periods,
@@ -343,4 +347,6 @@ class CrystalEmbedding(CrystalGraph):
         lattice = torch.FloatTensor(
             self.structure.lattice.matrix).reshape(-1, 1)  # (9, 1)
 
-        return {"atoms": atoms_padded, "elecneg": elecneg_padded, "covrad": covrad_padded, "FIE": FIE_padded, "elecaffi": elecaffi_padded, "AM": atomic_weight_padded, "AN": atomic_number_padded, "MN": mendeleev_no_padded, "positions": positions_padded, "padding_mask": self.padding, "lattice": lattice}
+        space_group_number = self.get_space_group_number()
+
+        return {"atoms": atoms_padded, "elecneg": elecneg_padded, "covrad": covrad_padded, "FIE": FIE_padded, "elecaffi": elecaffi_padded, "AM": atomic_weight_padded, "AN": atomic_number_padded, "MN": mendeleev_no_padded, "positions": positions_padded, "padding_mask": self.padding, "lattice": lattice,"SGN":space_group_number}

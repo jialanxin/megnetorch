@@ -11,11 +11,11 @@ atomic_valence_electron_number = MoS2_graph.get_valence_electron_number
 atomic_FIE = MoS2_graph.get_atomic_first_ionization_energy
 atomic_electron_affinity = MoS2_graph.get_atomic_electron_affinity
 atomic_block = MoS2_graph.get_atomic_blocks
-space_group = MoS2_graph.get_raman_mode_numbers()
 padding = MoS2_graph.padding
 positions = MoS2_graph.positions
 atomic_weight = MoS2_graph.get_atomic_weight
 mendeleev_no = MoS2_graph.get_mendeleev_no
 valence_electron = MoS2_graph.get_valence_electrons
+space_group = MoS2_graph.get_space_group_number()
 input = MoS2_graph.convert_to_model_input()
 print("end")

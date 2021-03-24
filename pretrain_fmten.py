@@ -29,6 +29,8 @@ class Experiment(pl.LightningModule):
             num_embeddings=95, embedding_dim=64, padding_idx=0)
         self.mendeleev_number_embedding = torch.nn.Embedding(
             num_embeddings=104, embedding_dim=64, padding_idx=0)
+        self.space_group_number_embedding = torch.nn.Embedding(
+            num_embeddings=230, embedding_dim=64)
         self.position_embedding = ff(60)
         self.lattice_embedding = ff(180)
         encode_layer = torch.nn.TransformerEncoderLayer(
@@ -50,8 +52,6 @@ class Experiment(pl.LightningModule):
         atoms = encoded_graph["atoms"]
         # padding_mask: (batch_size, max_atoms)
         padding_mask = encoded_graph["padding_mask"]
-        # lattice: (batch_size, 9, 1)
-        lattice = encoded_graph["lattice"]
         # (batch_size, max_atoms, 1)
         elecneg = encoded_graph["elecneg"]
         # (batch_size, max_atoms, 1)
@@ -103,12 +103,19 @@ class Experiment(pl.LightningModule):
         atoms = atoms+atomic_numbers+mendeleev_numbers + \
             positions  # (batch_size,max_atoms,atoms_info)
 
+        lattice = encoded_graph["lattice"]  # lattice: (batch_size, 9, 1)
         lattice = self.Gassian_expand(
             lattice, -15, 18, 20, 1.65, device)  # (batch_size, 9, 20)
         lattice = torch.flatten(lattice, start_dim=1)  # (batch_size,180)
         lattice = self.lattice_embedding(lattice)  # (batch_size,lacttice_info)
         # (batch_size,1,lacttice_info)
         lattice = torch.unsqueeze(lattice, dim=1)
+
+        space_group_number = encoded_graph["SGN"]  # (batch_size,1)
+        sgn = self.space_group_number_embedding(
+            space_group_number)  # (batch_size, 1,lattice_info)
+        lattice = lattice+sgn
+
         # (batch_size,1+max_atoms,atoms_info)
         atoms = torch.cat((lattice, atoms), dim=1)
         # (1+max_atoms, batch_size, atoms_info)
