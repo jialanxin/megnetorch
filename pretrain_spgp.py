@@ -9,6 +9,7 @@ from dataset import StructureSpaceGroupDataset
 import torch
 import torch.nn.functional as F
 from torch.nn import Embedding, RReLU, ReLU, Dropout
+from torchmetrics.functional import accuracy
 
 
 def ff(input_dim):
@@ -103,6 +104,9 @@ class Experiment(pl.LightningModule):
         predicted_spectrum = self.shared_procedure(batch)
         loss = F.cross_entropy(predicted_spectrum, ramans)
         self.log("train_loss", loss, on_epoch=True, on_step=False)
+        probability = F.softmax(predicted_spectrum,dim=1)
+        acc = accuracy(probability,ramans)
+        self.log("train_acc", acc, on_epoch=True, on_step=False)
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -111,6 +115,9 @@ class Experiment(pl.LightningModule):
         predicted_spectrum = self.shared_procedure(batch)
         loss = F.cross_entropy(predicted_spectrum, ramans)
         self.log("val_loss", loss, on_epoch=True, on_step=False)
+        probability = F.softmax(predicted_spectrum,dim=1)
+        acc = accuracy(probability,ramans)
+        self.log("val_acc", acc, on_epoch=True, on_step=False)
         return loss
 
     def configure_optimizers(self):
