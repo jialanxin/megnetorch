@@ -13,11 +13,11 @@ from torchmetrics.functional import accuracy
 
 
 def ff(input_dim):
-    return torch.nn.Sequential(torch.nn.Linear(input_dim, 64))
+    return torch.nn.Sequential(torch.nn.Linear(input_dim, 128))
 
 
 def ff_output(input_dim, output_dim):
-    return torch.nn.Sequential(torch.nn.Linear(input_dim, 128), torch.nn.RReLU(), Dropout(0.1), torch.nn.Linear(128, 64), torch.nn.RReLU(), Dropout(0.1), torch.nn.Linear(64, output_dim))
+    return torch.nn.Sequential(torch.nn.Linear(input_dim, 128), torch.nn.RReLU(), Dropout(0.1), torch.nn.Linear(128, 256), torch.nn.RReLU(), Dropout(0.1), torch.nn.Linear(256, output_dim))
 
 
 class Experiment(pl.LightningModule):
@@ -25,13 +25,13 @@ class Experiment(pl.LightningModule):
         super().__init__()
         self.save_hyperparameters()
         self.lr = lr
-        self.position_embedding = ff(60)
-        self.lattice_embedding = ff(200)
+        self.position_embedding = ff(120)
+        self.lattice_embedding = ff(400)
         encode_layer = torch.nn.TransformerEncoderLayer(
-            d_model=64, nhead=8, dim_feedforward=256)
+            d_model=128, nhead=8, dim_feedforward=512)
         self.encoder = torch.nn.TransformerEncoder(
             encode_layer, num_layers=num_enc)
-        self.readout = ff_output(input_dim=64, output_dim=230)
+        self.readout = ff_output(input_dim=128, output_dim=230)
 
     @staticmethod
     def Gassian_expand(value_list, min_value, max_value, intervals, expand_width, device):
@@ -50,12 +50,10 @@ class Experiment(pl.LightningModule):
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        positions = positions.unsqueeze(dim=3).expand(-1, -1, 3, 20)
-        centers = torch.linspace(-15, 18, 20).to(device)
-        # (batch_size, max_atoms, 3, 20)
-        positions = torch.exp(-(positions - centers)**2/1.65**2)
-        # (batch_size, max_atoms, 60)
-        positions = torch.flatten(positions, start_dim=2)
+        positions = positions.unsqueeze(dim=3).expand(-1, -1, 3, 40)
+        centers = torch.linspace(-15, 18, 40).to(device)
+        positions = torch.exp(-(positions - centers)**2/0.83**2)  # (batch_size, max_atoms, 3, 40)
+        positions = torch.flatten(positions, start_dim=2)         # (batch_size, max_atoms, 120)
 
         # (batch_size,max_atoms,positions_info)
         positions = self.position_embedding(positions)
@@ -64,14 +62,14 @@ class Experiment(pl.LightningModule):
 
         lattice = encoded_graph["lattice"]  # lattice: (batch_size, 9, 1)
         lattice = self.Gassian_expand(
-            lattice, -15, 18, 20, 1.65, device)  # (batch_size, 9, 20)
-        lattice = torch.flatten(lattice, start_dim=1)  # (batch_size,180)
+            lattice, -15, 18, 40, 0.83, device)  # (batch_size, 9, 40)
+        lattice = torch.flatten(lattice, start_dim=1)  # (batch_size,360)
 
         cell_volume = torch.log(encoded_graph["CV"])   # lattice: (batch_size,1,1)
-        cell_volume = self.Gassian_expand(cell_volume,3,8,20,0.25,device) # (batch_size,1,20)
-        cell_volume = torch.flatten(cell_volume,start_dim=1) # (batch_size, 20)
+        cell_volume = self.Gassian_expand(cell_volume,3,8,40,0.13,device) # (batch_size,1,40)
+        cell_volume = torch.flatten(cell_volume,start_dim=1) # (batch_size, 40)
 
-        lattice = torch.cat((lattice,cell_volume),dim=1) # (batch_size, 200)
+        lattice = torch.cat((lattice,cell_volume),dim=1) # (batch_size, 400)
         lattice = self.lattice_embedding(lattice)  # (batch_size,lacttice_info)
         lattice = torch.unsqueeze(lattice, dim=1)  # (batch_size,1,lacttice_info)
 

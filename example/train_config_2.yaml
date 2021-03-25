@@ -1,5 +1,5 @@
 prefix:
-  "gdrive/MyDrive/Raman_machine_learning/models/v0.4.5/1.pretrain_fmten_after_spgp/"
+  "/home/jlx/v0.4.5/3.pretrain_spgp_dim_128/"
 trainer: "fit"
 optimizer:
         lr: 5e-4
