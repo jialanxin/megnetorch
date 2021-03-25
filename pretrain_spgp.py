@@ -5,11 +5,11 @@ import pytorch_lightning as pl
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
 from torch.utils.data import DataLoader
+from dataset import StructureSpaceGroupDataset
 import torch
 import torch.nn.functional as F
-from dataset import StructureFmtEnDataset
 from torch.nn import Embedding, RReLU, ReLU, Dropout
-from pretrain_spgp import Experiment as SPGP
+from torchmetrics.functional import accuracy
 
 
 def ff(input_dim):
@@ -25,20 +25,13 @@ class Experiment(pl.LightningModule):
         super().__init__()
         self.save_hyperparameters()
         self.lr = lr
-        self.atom_embedding = ff(159)
-        self.atomic_number_embedding = torch.nn.Embedding(
-            num_embeddings=95, embedding_dim=64, padding_idx=0)
-        self.mendeleev_number_embedding = torch.nn.Embedding(
-            num_embeddings=104, embedding_dim=64, padding_idx=0)
-        self.space_group_number_embedding = torch.nn.Embedding(
-            num_embeddings=230, embedding_dim=64)
-        spgp_model = SPGP.load_from_checkpoint("pretrain/spacegroup/epoch=964-step=486359.ckpt")
-        self.position_embedding = spgp_model.position_embedding
-        self.lattice_embedding = spgp_model.lattice_embedding
+        self.position_embedding = ff(60)
+        self.lattice_embedding = ff(200)
         encode_layer = torch.nn.TransformerEncoderLayer(
             d_model=64, nhead=8, dim_feedforward=256)
-        self.encoder = spgp_model.encoder
-        self.readout = ff_output(input_dim=64, output_dim=1)
+        self.encoder = torch.nn.TransformerEncoder(
+            encode_layer, num_layers=num_enc)
+        self.readout = ff_output(input_dim=64, output_dim=230)
 
     @staticmethod
     def Gassian_expand(value_list, min_value, max_value, intervals, expand_width, device):
@@ -49,39 +42,13 @@ class Experiment(pl.LightningModule):
 
     def shared_procedure(self, batch):
         encoded_graph, _ = batch
-        # atoms: (batch_size,max_atoms,59)
-        atoms = encoded_graph["atoms"]
         # padding_mask: (batch_size, max_atoms)
         padding_mask = encoded_graph["padding_mask"]
-        # (batch_size, max_atoms, 1)
-        elecneg = encoded_graph["elecneg"]
-        # (batch_size, max_atoms, 1)
-        covrad = encoded_graph["covrad"]
-        # (batch_size, max_atoms, 1)
-        FIE = encoded_graph["FIE"]
-        # (batch_size, max_atoms, 1)
-        elecaffi = encoded_graph["elecaffi"]
-        # (batch_size, max_atoms, 1)
-        atmwht = encoded_graph["AM"]
 
         # (batch_size, max_atoms, 3)
         positions = encoded_graph["positions"]
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-        # (batch_size, max_atoms, 20)
-        elecneg = self.Gassian_expand(elecneg, 0.5, 4.0, 20, 0.18, device)
-        # (batch_size, max_atoms, 20)
-        covrad = self.Gassian_expand(covrad, 50, 250, 20, 10, device)
-        # (batch_size, max_atoms, 20)
-        FIE = self.Gassian_expand(FIE, 3, 25, 20, 1.15, device)
-        # (batch_size, max_atoms, 20)
-        elecaffi = self.Gassian_expand(elecaffi, -3, 3.7, 20, 0.34, device)
-        # (batch_size, max_atoms, 20)
-        atmwht = self.Gassian_expand(atmwht, 0, 210, 20, 10.5, device)
-        # (batch_size, max_atoms, 159)
-        atoms = torch.cat(
-            (atoms, elecneg, covrad, FIE, elecaffi, atmwht), dim=2)
 
         positions = positions.unsqueeze(dim=3).expand(-1, -1, 3, 20)
         centers = torch.linspace(-15, 18, 20).to(device)
@@ -90,19 +57,10 @@ class Experiment(pl.LightningModule):
         # (batch_size, max_atoms, 60)
         positions = torch.flatten(positions, start_dim=2)
 
-        atoms = self.atom_embedding(atoms)  # (batch_size,max_atoms,atoms_info)
         # (batch_size,max_atoms,positions_info)
         positions = self.position_embedding(positions)
 
-        atmnb = encoded_graph["AN"]  # (batch_size, max_atoms)
-        atomic_numbers = self.atomic_number_embedding(atmnb)
-
-        mennb = encoded_graph["MN"]  # (batch_size, max_atoms)
-        mendeleev_numbers = self.mendeleev_number_embedding(
-            mennb)  # (batch_size, max_atoms, atoms_info)
-
-        atoms = atoms+atomic_numbers+mendeleev_numbers + \
-            positions  # (batch_size,max_atoms,atoms_info)
+        atoms = positions  # (batch_size,max_atoms,atoms_info)
 
         lattice = encoded_graph["lattice"]  # lattice: (batch_size, 9, 1)
         lattice = self.Gassian_expand(
@@ -116,11 +74,6 @@ class Experiment(pl.LightningModule):
         lattice = torch.cat((lattice,cell_volume),dim=1) # (batch_size, 200)
         lattice = self.lattice_embedding(lattice)  # (batch_size,lacttice_info)
         lattice = torch.unsqueeze(lattice, dim=1)  # (batch_size,1,lacttice_info)
-
-        space_group_number = encoded_graph["SGN"]  # (batch_size,1)
-        sgn = self.space_group_number_embedding(
-            space_group_number)  # (batch_size, 1,lattice_info)
-        lattice = lattice+sgn
 
         # (batch_size,1+max_atoms,atoms_info)
         atoms = torch.cat((lattice, atoms), dim=1)
@@ -139,8 +92,6 @@ class Experiment(pl.LightningModule):
         system_out = atoms[0]  # (batch_size,atoms_info)
 
         output_spectrum = self.readout(system_out)  # (batch_size, raman_info)
-        output_spectrum = output_spectrum*4
-
         return output_spectrum
 
     def forward(self, batch):
@@ -149,23 +100,24 @@ class Experiment(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         _, ramans = batch
+        ramans = ramans.squeeze(dim=1)
         predicted_spectrum = self.shared_procedure(batch)
-        loss = F.l1_loss(predicted_spectrum, ramans)
-        # print(f"loss:{loss}")
+        loss = F.cross_entropy(predicted_spectrum, ramans)
         self.log("train_loss", loss, on_epoch=True, on_step=False)
-        # similarity = F.cosine_similarity(
-        #     predicted_spectrum, ramans_of_batch).mean()
-        # self.log("train_simi", similarity, on_epoch=True, on_step=False)
+        probability = F.softmax(predicted_spectrum,dim=1)
+        acc = accuracy(probability,ramans)
+        self.log("train_acc", acc, on_epoch=True, on_step=False)
         return loss
 
     def validation_step(self, batch, batch_idx):
         _, ramans = batch
+        ramans = ramans.squeeze(dim=1)
         predicted_spectrum = self.shared_procedure(batch)
-        loss = F.l1_loss(predicted_spectrum, ramans)
+        loss = F.cross_entropy(predicted_spectrum, ramans)
         self.log("val_loss", loss, on_epoch=True, on_step=False)
-        # similarity = F.cosine_similarity(
-        #     predicted_spectrum, ramans_of_batch).mean()
-        # self.log("val_simi", similarity, on_epoch=True, on_step=False)
+        probability = F.softmax(predicted_spectrum,dim=1)
+        acc = accuracy(probability,ramans)
+        self.log("val_acc", acc, on_epoch=True, on_step=False)
         return loss
 
     def configure_optimizers(self):
@@ -216,8 +168,8 @@ if __name__ == "__main__":
         config = yaml.load(f.read(), Loader=yaml.BaseLoader)
     prefix = config["prefix"]
 
-    train_set = torch.load("./materials/mp/Train_fmten_set.pt")
-    validate_set = torch.load("./materials/mp/Valid_fmten_set.pt")
+    train_set = torch.load("./materials/mp/Train_spgp_set.pt")
+    validate_set = torch.load("./materials/mp/Valid_spgp_set.pt")
 
     train_dataloader = DataLoader(
         dataset=train_set, batch_size=128, num_workers=8)
@@ -225,9 +177,9 @@ if __name__ == "__main__":
         dataset=validate_set, batch_size=128, num_workers=8)
 
     checkpoint_callback = ModelCheckpoint(
-        monitor='val_loss',
+        monitor='val_acc',
         save_top_k=3,
-        mode='min',
+        mode='max',
     )
     try:
         path = config["checkpoint"]
