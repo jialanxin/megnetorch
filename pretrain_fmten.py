@@ -9,6 +9,7 @@ import torch
 import torch.nn.functional as F
 from dataset import StructureFmtEnDataset
 from torch.nn import Embedding, RReLU, ReLU, Dropout
+from pretrain_spgp import Experiment as SPGP
 
 
 def ff(input_dim):
@@ -31,12 +32,12 @@ class Experiment(pl.LightningModule):
             num_embeddings=104, embedding_dim=64, padding_idx=0)
         self.space_group_number_embedding = torch.nn.Embedding(
             num_embeddings=230, embedding_dim=64)
-        self.position_embedding = ff(60)
-        self.lattice_embedding = ff(200)
+        spgp_model = SPGP.load_from_checkpoint("pretrain/spacegroup/epoch=964-step=486359.ckpt")
+        self.position_embedding = spgp_model.position_embedding
+        self.lattice_embedding = spgp_model.lattice_embedding
         encode_layer = torch.nn.TransformerEncoderLayer(
             d_model=64, nhead=8, dim_feedforward=256)
-        self.encoder = torch.nn.TransformerEncoder(
-            encode_layer, num_layers=num_enc)
+        self.encoder = spgp_model.encoder
         self.readout = ff_output(input_dim=64, output_dim=1)
 
     @staticmethod

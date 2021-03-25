@@ -1,5 +1,5 @@
 prefix:
-  "/home/jlx/v0.4.4/31.pretrain_spgp/"
+  "/home/jlx/v0.4.4/34.pretrain_fmten_after_spgp/"
 trainer: "fit"
 optimizer:
         lr: 5e-4
