@@ -20,7 +20,7 @@ class Experiment(Finetune):
         self.save_hyperparameters()
         self.lr = lr
         pretrain_model = Finetune.load_from_checkpoint(
-            "pretrain/finetuned/epoch=3805-step=216941.ckpt")
+            "pretrain/finetuned/epoch=3886-step=221558.ckpt")
         self.atom_embedding = pretrain_model.atom_embedding
         self.atomic_number_embedding = pretrain_model.atomic_number_embedding
         self.mendeleev_number_embedding = pretrain_model.mendeleev_number_embedding
@@ -83,7 +83,7 @@ def load_loss_formula():
     return data["loss"],data["formula"],data["raman"],data["predict"]
 
 if __name__ == "__main__":
-    # save_loss_formula()
+    save_loss_formula()
     loss,formula,ramams,predicts = load_loss_formula()
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=formula,y=loss,mode="markers"))

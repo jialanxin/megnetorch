@@ -17,7 +17,7 @@ class Experiment(Finetune):
         self.save_hyperparameters()
         self.lr = lr
         pretrain_model = Finetune.load_from_checkpoint(
-            "pretrain/finetuned/epoch=3805-step=216941.ckpt")
+            "pretrain/finetuned/epoch=3886-step=221558.ckpt")
         self.atom_embedding = pretrain_model.atom_embedding
         self.atomic_number_embedding = pretrain_model.atomic_number_embedding
         self.mendeleev_number_embedding = pretrain_model.mendeleev_number_embedding
@@ -42,7 +42,7 @@ if __name__ == "__main__":
     validate_dataloader = DataLoader(
         dataset=validate_set, batch_size=64, num_workers=1)
     model = Experiment()
-    for i,data in enumerate(train_dataloader):
+    for i,data in enumerate(validate_dataloader):
         _,raman = data
         predicted_spectrum =  model(data)
         where_zero = torch.eq(raman,torch.zeros_like(raman))
@@ -124,14 +124,14 @@ if __name__ == "__main__":
 
 # Train:  loss_weight_4_sign
 # label\predict:          0,      1,      2,
-# 0,                 0.9416, 0.0554, 0.0027
-# 1,                 0.0942, 0.8888, 0.0167
-# 2,                 0.0941, 0.8832, 0.0217
+# 0,                 0.9381, 0.0591, 0.0026
+# 1,                 0.0952, 0.8891, 0.0156
+# 2,                 0.0951, 0.8843, 0.0199
 # Validate:
 # label\predict:            0,      1,      2,
-# 0,                   0.9008, 0.0857, 0.0111
-# 1,                   0.2822, 0.5999, 0.0995
-# 2,                   0.2824, 0.5833, 0.1111
+# 0,                   0.9004, 0.0872, 0.0095
+# 1,                   0.2691, 0.6080, 0.0988
+# 2,                   0.2671, 0.5983, 0.1060
 
 # Train:  loss_weight_4_sign_batch_128
 # label\predict:          0,      1,      2,
