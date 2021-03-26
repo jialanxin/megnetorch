@@ -20,7 +20,7 @@ class Experiment(Finetune):
         self.save_hyperparameters()
         self.lr = lr
         pretrain_model = Finetune.load_from_checkpoint(
-            "pretrain/finetuned/epoch=3887-step=221615.ckpt")
+            "pretrain/finetuned/epoch=3791-step=216143.ckpt")
         self.atom_embedding = pretrain_model.atom_embedding
         self.atomic_number_embedding = pretrain_model.atomic_number_embedding
         self.mendeleev_number_embedding = pretrain_model.mendeleev_number_embedding
@@ -35,7 +35,7 @@ class Experiment(Finetune):
         return spectrum_round
   
 def load_dataset():
-    with open("materials/JVASP/Valid_CrystalRamans.json","r") as f:
+    with open("materials/JVASP/Valid_set.json","r") as f:
         data = json.loads(f.read())
     dataset = RamanFormularDataset(data)
     return dataset
@@ -88,12 +88,12 @@ if __name__ == "__main__":
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=formula,y=loss,mode="markers"))
     st.write(fig)
-    word = st.text_input("Insert a formula", "Mn2 Au5")
+    word = st.text_input("Insert a formula", "Na6 Bi2")
     index = formula.index(word)
     raman = ramams[index].flatten()
     predict = predicts[index].flatten()
     fig2 = go.Figure()
-    fig2.add_trace(go.Bar(x=np.linspace(100,1156,25),y=raman,name="lable"))
-    fig2.add_trace(go.Bar(x=np.linspace(100,1156,25),y=predict,name="predict"))
+    fig2.add_trace(go.Bar(x=np.linspace(100,1178,50),y=raman,name="lable"))
+    fig2.add_trace(go.Bar(x=np.linspace(100,1178,50),y=predict,name="predict"))
     st.write(fig2)
     st.write(f"loss:{loss[index]}")
