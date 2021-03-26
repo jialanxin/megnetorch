@@ -17,7 +17,7 @@ class Experiment(Finetune):
         self.save_hyperparameters()
         self.lr = lr
         pretrain_model = Finetune.load_from_checkpoint(
-            "pretrain/finetuned/epoch=3887-step=221615.ckpt")
+            "pretrain/finetuned/epoch=3924-step=223724.ckpt")
         self.atom_embedding = pretrain_model.atom_embedding
         self.atomic_number_embedding = pretrain_model.atomic_number_embedding
         self.mendeleev_number_embedding = pretrain_model.mendeleev_number_embedding
@@ -32,6 +32,18 @@ class Experiment(Finetune):
         spectrum_round = torch.round(predicted_spectrum)
         return spectrum_round
 
+def hist_count(num,raman,predicted_spectrum):
+    where_num = torch.eq(raman,num*torch.ones_like(raman))
+    predict_where_num = predicted_spectrum[where_num]
+    count = predict_where_num.shape[0]
+    if count != 0:
+        hist = torch.histc(predict_where_num,bins=3,min=0,max=2)
+        hist = hist/count
+    else:
+        hist = torch.zeros((3,))
+    return hist
+    
+
 
 
 if __name__ == "__main__":
@@ -42,31 +54,22 @@ if __name__ == "__main__":
     validate_dataloader = DataLoader(
         dataset=validate_set, batch_size=64, num_workers=1)
     model = Experiment()
-    for i,data in enumerate(train_dataloader):
+    for i,data in enumerate(validate_dataloader):
         _,raman = data
         predicted_spectrum =  model(data)
-        where_zero = torch.eq(raman,torch.zeros_like(raman))
-        predict_where_zeros = predicted_spectrum[where_zero]
-        hist = torch.histc(predict_where_zeros,bins=3,min=0,max=2)
-        hist = hist/predict_where_zeros.shape[0]
+        hist = hist_count(0,raman,predicted_spectrum)
         if i == 0:
             m0 = hist.unsqueeze(dim=0)
         else:
             m0 = torch.cat((m0,hist.unsqueeze(dim=0)),dim=0)
 
-        where_zero = torch.eq(raman,torch.ones_like(raman))
-        predict_where_zeros = predicted_spectrum[where_zero]
-        hist = torch.histc(predict_where_zeros,bins=3,min=0,max=2)
-        hist = hist/predict_where_zeros.shape[0]
+        hist = hist_count(1,raman,predicted_spectrum)
         if i == 0:
             m1 = hist.unsqueeze(dim=0)
         else:
             m1 = torch.cat((m1,hist.unsqueeze(dim=0)),dim=0)
 
-        where_zero = torch.eq(raman,2*torch.ones_like(raman))
-        predict_where_zeros = predicted_spectrum[where_zero]
-        hist = torch.histc(predict_where_zeros,bins=3,min=0,max=2)
-        hist = hist/predict_where_zeros.shape[0]
+        hist = hist_count(2,raman,predicted_spectrum)
         if i == 0:
             m2 = hist.unsqueeze(dim=0)
         else:
@@ -135,14 +138,25 @@ if __name__ == "__main__":
 
 # Train:  loss_weight_4_sign_batch_128
 # label\predict:          0,      1,      2,
-# 0,                 0.9456, 0.0519, 0.0024
-# 1,                 0.0814, 0.9031, 0.0154
-# 2,                 0.0807, 0.8974, 0.0211
+# 0,                 0.9352, 0.0631, 0.0016
+# 1,                 0.1748, 0.8111, 0.0139
+# 2,                 0.1732, 0.8041, 0.0138
 # Validate:
 # label\predict:            0,      1,      2,
-# 0,                   0.9029, 0.0848, 0.0098
-# 1,                   0.3006, 0.5712, 0.1064
-# 2,                   0.3012, 0.5578, 0.1147
+# 0,                   0.9106, 0.0824, 0.0064
+# 1,                   0.3825, 0.5310, 0.0730
+# 2,                   0.3794, 0.5186, 0.0685
+
+# Train:  loss_weight_4_sign_lr_1e-3
+# label\predict:          0,      1,      2,
+# 0,                 0.9363, 0.0619, 0.0017
+# 1,                 0.1538, 0.8324, 0.0138
+# 2,                 0.1524, 0.8252, 0.0137
+# Validate:
+# label\predict:            0,      1,      2,
+# 0,                   0.9117, 0.0814, 0.0060
+# 1,                   0.3790, 0.5466, 0.0600
+# 2,                   0.3761, 0.5332, 0.0563
 
 # Train:  loss_weight_4_sign_batch_256
 # label\predict:          0,      1,      2,
