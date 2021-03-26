@@ -37,7 +37,7 @@ class Experiment(pl.LightningModule):
         self.position_embedding = spgp_model.position_embedding
         self.lattice_embedding = spgp_model.lattice_embedding
         self.encoder = spgp_model.encoder
-        self.readout = ff_output(input_dim=64, output_dim=25)
+        self.readout = ff_output(input_dim=64, output_dim=50)
 
     @staticmethod
     def Gassian_expand(value_list, min_value, max_value, intervals, expand_width, device):
