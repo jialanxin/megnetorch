@@ -1,5 +1,5 @@
 prefix:
-  "gdrive/MyDrive/Raman_machine_learning/models/v0.4.5/2.finetune_cell_volume/"
+  "gdrive/MyDrive/Raman_machine_learning/models/v0.4.5/3.finetune_after_spgp/"
 trainer: "fit"
 optimizer:
         lr: 5e-4

@@ -9,7 +9,8 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from torch.utils.data import DataLoader
 from torch.nn import Embedding, RReLU, ReLU, Dropout
 from dataset import StructureRamanDataset
-from pretrain_fmten import Experiment as Pretrain
+from pretrain_fmten import Experiment as FmtEn
+from pretrain_spgp import Experiment as SPGP
 
 
 def ff(input_dim):
@@ -25,15 +26,17 @@ class Experiment(pl.LightningModule):
         super().__init__()
         self.save_hyperparameters()
         self.lr = lr
-        pretrain_model = Pretrain.load_from_checkpoint(
-            "pretrain/epoch=967-step=487871.ckpt")
-        self.atom_embedding = pretrain_model.atom_embedding
-        self.atomic_number_embedding = pretrain_model.atomic_number_embedding
-        self.space_group_number_embedding = pretrain_model.space_group_number_embedding
-        self.mendeleev_number_embedding = pretrain_model.mendeleev_number_embedding
-        self.position_embedding = pretrain_model.position_embedding
-        self.lattice_embedding = pretrain_model.lattice_embedding
-        self.encoder = pretrain_model.encoder
+        fmten_model = FmtEn.load_from_checkpoint(
+            "pretrain/fmten/epoch=969-step=488879.ckpt")
+        spgp_model = SPGP.load_from_checkpoint(
+            "pretrain/spacegroup/epoch=964-step=486359.ckpt")
+        self.atom_embedding = fmten_model.atom_embedding
+        self.atomic_number_embedding = fmten_model.atomic_number_embedding
+        self.space_group_number_embedding = fmten_model.space_group_number_embedding
+        self.mendeleev_number_embedding = fmten_model.mendeleev_number_embedding
+        self.position_embedding = spgp_model.position_embedding
+        self.lattice_embedding = spgp_model.lattice_embedding
+        self.encoder = spgp_model.encoder
         self.readout = ff_output(input_dim=64, output_dim=25)
 
     @staticmethod
@@ -102,13 +105,17 @@ class Experiment(pl.LightningModule):
             lattice, -15, 18, 20, 1.65, device)  # (batch_size, 9, 20)
         lattice = torch.flatten(lattice, start_dim=1)  # (batch_size,180)
 
-        cell_volume = torch.log(encoded_graph["CV"])   # lattice: (batch_size,1,1)
-        cell_volume = self.Gassian_expand(cell_volume,3,8,20,0.25,device) # (batch_size,1,20)
-        cell_volume = torch.flatten(cell_volume,start_dim=1) # (batch_size, 20)
+        # lattice: (batch_size,1,1)
+        cell_volume = torch.log(encoded_graph["CV"])
+        cell_volume = self.Gassian_expand(
+            cell_volume, 3, 8, 20, 0.25, device)  # (batch_size,1,20)
+        cell_volume = torch.flatten(
+            cell_volume, start_dim=1)  # (batch_size, 20)
 
-        lattice = torch.cat((lattice,cell_volume),dim=1) # (batch_size, 200)
+        lattice = torch.cat((lattice, cell_volume), dim=1)  # (batch_size, 200)
         lattice = self.lattice_embedding(lattice)  # (batch_size,lacttice_info)
-        lattice = torch.unsqueeze(lattice, dim=1)  # (batch_size,1,lacttice_info)
+        # (batch_size,1,lacttice_info)
+        lattice = torch.unsqueeze(lattice, dim=1)
 
         space_group_number = encoded_graph["SGN"]  # (batch_size,1)
         sgn = self.space_group_number_embedding(
@@ -239,9 +246,9 @@ if __name__ == "__main__":
     train_set = torch.load("materials/JVASP/Train_raman_set.pt")
     validate_set = torch.load("materials/JVASP/Valid_raman_set.pt")
     train_dataloader = DataLoader(
-        dataset=train_set, batch_size=128, num_workers=8, shuffle=True)
+        dataset=train_set, batch_size=128, num_workers=2, shuffle=True)
     validate_dataloader = DataLoader(
-        dataset=validate_set, batch_size=128, num_workers=8)
+        dataset=validate_set, batch_size=128, num_workers=2)
 
     try:
         path = config["checkpoint"]
