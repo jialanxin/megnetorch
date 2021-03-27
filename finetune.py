@@ -172,7 +172,7 @@ class Experiment(pl.LightningModule):
         loss = F.l1_loss(predicted_spectrum, ramans, reduction="none")
         self.log("train_loss", loss.mean(), on_epoch=True, on_step=False)
         raman_sign = torch.sign(ramans)
-        loss_weight = torch.pow(5, raman_sign)
+        loss_weight = torch.pow(4, raman_sign)
         weight_sum = loss_weight.sum(dim=1, keepdim=True)
         loss_weight = loss_weight/weight_sum
         loss_weighed = torch.sum(loss*loss_weight, dim=1).mean()
@@ -195,7 +195,7 @@ class Experiment(pl.LightningModule):
         loss = F.l1_loss(predicted_spectrum, ramans, reduction="none")
         self.log("val_loss", loss.mean(), on_epoch=True, on_step=False)
         raman_sign = torch.sign(ramans)
-        loss_weight = torch.pow(5, raman_sign)
+        loss_weight = torch.pow(4, raman_sign)
         weight_sum = loss_weight.sum(dim=1, keepdim=True)
         loss_weight = loss_weight/weight_sum
         loss_weighed = torch.sum(loss*loss_weight, dim=1).mean()
