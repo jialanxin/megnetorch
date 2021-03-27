@@ -17,7 +17,7 @@ def ff(input_dim):
 
 
 def ff_output(input_dim, output_dim):
-    return torch.nn.Sequential(torch.nn.Linear(input_dim, 128), torch.nn.RReLU(), Dropout(0.1), torch.nn.Linear(128, 64), torch.nn.RReLU(), Dropout(0.1), torch.nn.Linear(64, output_dim))
+    return torch.nn.Sequential(torch.nn.Linear(input_dim, 128), torch.nn.GELU(), Dropout(0.1), torch.nn.Linear(128, 64), torch.nn.GELU(), Dropout(0.1), torch.nn.Linear(64, output_dim))
 
 
 class Experiment(pl.LightningModule):
@@ -32,7 +32,7 @@ class Experiment(pl.LightningModule):
             num_embeddings=104, embedding_dim=128, padding_idx=0)
         self.space_group_number_embedding = torch.nn.Embedding(
             num_embeddings=230, embedding_dim=128)
-        spgp_model = SPGP.load_from_checkpoint("pretrain/spacegroup/epoch=450-step=227303.ckpt")
+        spgp_model = SPGP.load_from_checkpoint("pretrain/spacegroup/epoch=716-step=361367.ckpt")
         self.position_embedding = spgp_model.position_embedding
         self.lattice_embedding = spgp_model.lattice_embedding
         self.encoder = spgp_model.encoder
