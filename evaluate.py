@@ -20,7 +20,7 @@ class Experiment(Finetune):
         self.save_hyperparameters()
         self.lr = lr
         pretrain_model = Finetune.load_from_checkpoint(
-            "pretrain/finetuned/epoch=3798-step=216542.ckpt")
+            "pretrain/finetuned/epoch=3069-step=174989.ckpt")
         self.atom_embedding = pretrain_model.atom_embedding
         self.atomic_number_embedding = pretrain_model.atomic_number_embedding
         self.mendeleev_number_embedding = pretrain_model.mendeleev_number_embedding
@@ -48,6 +48,7 @@ class RamanFormularDataset(StructureRamanDataset):
             structure = IStructure.from_dict(item)
             try:
                 raman = torch.FloatTensor(item["raman"])
+                mp_id = item["mp_id"]
                 formula = structure.formula
                 graph = CrystalEmbedding(structure,max_atoms=30)
             except ValueError:
@@ -57,7 +58,7 @@ class RamanFormularDataset(StructureRamanDataset):
             except TypeError:
                 continue
             encoded_graph = graph.convert_to_model_input()
-            couples.append((encoded_graph,raman,formula))
+            couples.append((encoded_graph,raman,formula,mp_id))
         return couples
 
 def save_loss_formula():
@@ -68,8 +69,9 @@ def save_loss_formula():
     loss_list = []
     raman_list = []
     predict_list = []
+    mp_id_list = []
     for i, data in enumerate(dataloader):
-        graph, ramans, formula = data
+        graph, ramans, formula, mp_id = data
         input = (graph,ramans)
         predicted_spectrum = model(input)
         loss = F.l1_loss(predicted_spectrum, ramans)
@@ -77,14 +79,15 @@ def save_loss_formula():
         loss_list.append(loss.item())
         raman_list.append(ramans.detach().numpy())
         predict_list.append(predicted_spectrum.detach().numpy())
-    torch.save({"loss":loss_list,"formula":formula_list,"raman":raman_list,"predict":predict_list},"materials/JVASP/loss_formula.pt")
+        mp_id_list.append(mp_id)
+    torch.save({"loss":loss_list,"formula":formula_list,"mp_id":mp_id_list, "raman":raman_list,"predict":predict_list},"materials/JVASP/loss_formula.pt")
 def load_loss_formula():
     data = torch.load("materials/JVASP/loss_formula.pt")
-    return data["loss"],data["formula"],data["raman"],data["predict"]
+    return data["loss"],data["formula"],data["raman"],data["predict"],data["mp_id"]
 
 if __name__ == "__main__":
     # save_loss_formula()
-    loss,formula,ramams,predicts = load_loss_formula()
+    loss,formula,ramams,predicts,mp_id = load_loss_formula()
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=formula,y=loss,mode="markers"))
     st.write(fig)
@@ -92,8 +95,10 @@ if __name__ == "__main__":
     index = formula.index(word)
     raman = ramams[index].flatten()
     predict = predicts[index].flatten()
+    mp_id = mp_id[index][0]
     fig2 = go.Figure()
     fig2.add_trace(go.Scatter(x=np.linspace(100,1178,50),y=raman,name="lable"))
     fig2.add_trace(go.Scatter(x=np.linspace(100,1178,50),y=predict,name="predict"))
     st.write(fig2)
     st.write(f"loss:{loss[index]}")
+    st.write(f"mp_link : https://www.materialsproject.org/materials/mp-{mp_id}")
