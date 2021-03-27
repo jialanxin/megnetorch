@@ -1,7 +1,7 @@
 prefix:
-  "gdrive/MyDrive/Raman_machine_learning/models/v0.4.5/14.finetune_weight_5_dim_128_new_metrics/"
+  "gdrive/MyDrive/Raman_machine_learning/models/v0.4.5/19.finetune_gelu_outputdim_100_weight_5/"
 trainer: "fit"
 optimizer:
-        lr: 1e-3
+        lr: 5e-4
         type: "Adam"
 # checkpoint: "gdrive/MyDrive/Raman_machine_learning/models/v0.4.3/19.finetune_lr_te-4/default/version_0/checkpoints/epoch=1909-step=217739.ckpt"
