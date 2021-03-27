@@ -146,13 +146,33 @@ class Experiment(pl.LightningModule):
     def forward(self, batch):
         predicted_spectrum = self.shared_procedure(batch)
         return predicted_spectrum
+    @staticmethod
+    def scores(spectrum_sign,raman_sign):
+        where_zero = torch.eq(raman_sign,torch.zeros_like(raman_sign))
+        where_not_zero = torch.logical_not(where_zero)
+        spectrum_should_zero = spectrum_sign[where_zero]
+        spectrum_should_not_zero = spectrum_sign[where_not_zero]
+        true_negative = torch.eq(spectrum_should_zero,torch.zeros_like(spectrum_should_zero)) # 0->0
+        false_positive = torch.logical_not(true_negative)                                     # 0->1
+        false_negative = torch.eq(spectrum_should_not_zero,torch.zeros_like(spectrum_should_not_zero)) # 1->0
+        true_positive = torch.logical_not(false_negative)                                     # 1->1
+        true_negative = true_negative.float().sum()
+        false_positive = false_positive.float().sum()
+        false_negative = false_negative.float().sum()
+        true_positive = true_positive.float().sum()
+        Accuracy = (true_positive+true_negative)/(true_positive+true_negative+false_positive+false_negative)
+        Precision = true_positive/(true_positive+false_positive)
+        Recall = true_positive/(true_positive+false_negative)
+        F1score = 2*Precision*Recall/(Precision+Recall)
+        return Accuracy,Precision,Recall,F1score
 
     def training_step(self, batch, batch_idx):
         _, ramans = batch
         predicted_spectrum = self.shared_procedure(batch)
         loss = F.l1_loss(predicted_spectrum, ramans, reduction="none")
         self.log("train_loss", loss.mean(), on_epoch=True, on_step=False)
-        loss_weight = torch.pow(6, torch.sign(ramans))
+        raman_sign = torch.sign(ramans)
+        loss_weight = torch.pow(3, raman_sign)
         weight_sum = loss_weight.sum(dim=1, keepdim=True)
         loss_weight = loss_weight/weight_sum
         loss_weighed = torch.sum(loss*loss_weight, dim=1).mean()
@@ -161,11 +181,12 @@ class Experiment(pl.LightningModule):
         spectrum_round = torch.round(predicted_spectrum)
         loss_round = F.l1_loss(spectrum_round, ramans)
         self.log("train_loss_round", loss_round, on_epoch=True, on_step=False)
-        similarity = F.cosine_similarity(
-            predicted_spectrum, ramans).mean()
-        self.log("train_simi", similarity, on_epoch=True, on_step=False)
-        Hamming = torch.eq(spectrum_round, ramans).float().mean()
-        self.log("train_hamming", Hamming, on_epoch=True, on_step=False)
+        spectrum_sign = torch.sign(spectrum_round)
+        acc,prc,rec,f1 = self.scores(spectrum_sign,raman_sign)
+        self.log("train_acc", acc, on_epoch=True, on_step=False)
+        self.log("train_prc", prc, on_epoch=True, on_step=False)
+        self.log("train_rec", rec, on_epoch=True, on_step=False)
+        self.log("train_f1", f1, on_epoch=True, on_step=False)
         return loss_weighed
 
     def validation_step(self, batch, batch_idx):
@@ -173,7 +194,8 @@ class Experiment(pl.LightningModule):
         predicted_spectrum = self.shared_procedure(batch)
         loss = F.l1_loss(predicted_spectrum, ramans, reduction="none")
         self.log("val_loss", loss.mean(), on_epoch=True, on_step=False)
-        loss_weight = torch.pow(6, torch.sign(ramans))
+        raman_sign = torch.sign(ramans)
+        loss_weight = torch.pow(3, raman_sign)
         weight_sum = loss_weight.sum(dim=1, keepdim=True)
         loss_weight = loss_weight/weight_sum
         loss_weighed = torch.sum(loss*loss_weight, dim=1).mean()
@@ -182,11 +204,12 @@ class Experiment(pl.LightningModule):
         spectrum_round = torch.round(predicted_spectrum)
         loss_round = F.l1_loss(spectrum_round, ramans)
         self.log("val_loss_round", loss_round, on_epoch=True, on_step=False)
-        similarity = F.cosine_similarity(
-            predicted_spectrum, ramans).mean()
-        self.log("val_simi", similarity, on_epoch=True, on_step=False)
-        Hamming = torch.eq(spectrum_round, ramans).float().mean()
-        self.log("val_hamming", Hamming, on_epoch=True, on_step=False)
+        spectrum_sign = torch.sign(spectrum_round)
+        acc,prc,rec,f1 = self.scores(spectrum_sign,raman_sign)
+        self.log("val_acc", acc, on_epoch=True, on_step=False)
+        self.log("val_prc", prc, on_epoch=True, on_step=False)
+        self.log("val_rec", rec, on_epoch=True, on_step=False)
+        self.log("val_f1", f1, on_epoch=True, on_step=False)
         return loss_weighed
 
     def configure_optimizers(self):
@@ -238,7 +261,7 @@ if __name__ == "__main__":
     prefix = config["prefix"]
 
     checkpoint_callback = ModelCheckpoint(
-        monitor='val_hamming',
+        monitor='val_f1',
         save_top_k=3,
         mode='max',
     )

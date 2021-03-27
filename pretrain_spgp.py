@@ -17,7 +17,7 @@ def ff(input_dim):
 
 
 def ff_output(input_dim, output_dim):
-    return torch.nn.Sequential(torch.nn.Linear(input_dim, 128), torch.nn.RReLU(), Dropout(0.1), torch.nn.Linear(128, 256), torch.nn.RReLU(), Dropout(0.1), torch.nn.Linear(256, output_dim))
+    return torch.nn.Sequential(torch.nn.Linear(input_dim, 128), torch.nn.GELU(), Dropout(0.1), torch.nn.Linear(128, 256), torch.nn.GELU(), Dropout(0.1), torch.nn.Linear(256, output_dim))
 
 
 class Experiment(pl.LightningModule):
@@ -28,7 +28,7 @@ class Experiment(pl.LightningModule):
         self.position_embedding = ff(120)
         self.lattice_embedding = ff(400)
         encode_layer = torch.nn.TransformerEncoderLayer(
-            d_model=128, nhead=8, dim_feedforward=512)
+            d_model=128, nhead=8, dim_feedforward=512,activation="gelu")
         self.encoder = torch.nn.TransformerEncoder(
             encode_layer, num_layers=num_enc)
         self.readout = ff_output(input_dim=128, output_dim=230)

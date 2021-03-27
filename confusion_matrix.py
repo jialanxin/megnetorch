@@ -17,7 +17,7 @@ class Experiment(Finetune):
         self.save_hyperparameters()
         self.lr = lr
         pretrain_model = Finetune.load_from_checkpoint(
-            "pretrain/finetuned/epoch=3069-step=174989.ckpt")
+            "pretrain/finetuned/epoch=3711-step=211583.ckpt")
         self.atom_embedding = pretrain_model.atom_embedding
         self.atomic_number_embedding = pretrain_model.atomic_number_embedding
         self.mendeleev_number_embedding = pretrain_model.mendeleev_number_embedding
@@ -54,7 +54,7 @@ if __name__ == "__main__":
     validate_dataloader = DataLoader(
         dataset=validate_set, batch_size=64, num_workers=1)
     model = Experiment().eval()
-    for i,data in enumerate(train_dataloader):
+    for i,data in enumerate(validate_dataloader):
         _,raman = data
         predicted_spectrum =  model(data)
         hist = hist_count(0,raman,predicted_spectrum)
@@ -204,11 +204,11 @@ if __name__ == "__main__":
 
 # Train:  loss_weight_6_sign
 # label\predict:          0,      1,      2,
-# 0,                 0.9014, 0.0961, 0.0024
-# 1,                 0.0779, 0.9196, 0.0024
-# 2,                 0.0772, 0.9116, 0.0024
+# 0,                 0.8719, 0.1247, 0.0031
+# 1,                 0.1242, 0.8676, 0.0079
+# 2,                 0.1231, 0.8600, 0.0078
 # Validate:
 # label\predict:            0,      1,      2,
-# 0,                   0.8791, 0.1134, 0.0066
-# 1,                   0.2560, 0.6621, 0.0701
-# 2,                   0.2400, 0.6624, 0.0657
+# 0,                   0.8656, 0.1280, 0.0053
+# 1,                   0.2607, 0.6712, 0.0545
+# 2,                   0.2653, 0.6709, 0.0511
