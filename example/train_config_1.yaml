@@ -1,5 +1,5 @@
 prefix:
-  "gdrive/MyDrive/Raman_machine_learning/models/v0.4.5/18.finetune_gelu_outputdim_100_weight_6/"
+  "gdrive/MyDrive/Raman_machine_learning/models/v0.4.5/20.finetune_outdim_uneq_50_weight_6/"
 trainer: "fit"
 optimizer:
         lr: 5e-4

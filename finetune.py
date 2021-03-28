@@ -37,7 +37,7 @@ class Experiment(pl.LightningModule):
         self.position_embedding = spgp_model.position_embedding
         self.lattice_embedding = spgp_model.lattice_embedding
         self.encoder = spgp_model.encoder
-        self.readout = ff_output(input_dim=128, output_dim=100)
+        self.readout = ff_output(input_dim=128, output_dim=50)
 
     @staticmethod
     def Gassian_expand(value_list, min_value, max_value, intervals, expand_width, device):
@@ -164,6 +164,7 @@ class Experiment(pl.LightningModule):
         Precision = true_positive/(true_positive+false_positive)
         Recall = true_positive/(true_positive+false_negative)
         F1score = 2*Precision*Recall/(Precision+Recall)
+        print(f"A:{Accuracy} P:{Precision} R:{Recall} F:{F1score}")
         return Accuracy,Precision,Recall,F1score
 
     def training_step(self, batch, batch_idx):
@@ -172,7 +173,7 @@ class Experiment(pl.LightningModule):
         loss = F.l1_loss(predicted_spectrum, ramans, reduction="none")
         self.log("train_loss", loss.mean(), on_epoch=True, on_step=False)
         raman_sign = torch.sign(ramans)
-        loss_weight = torch.pow(5, raman_sign)
+        loss_weight = torch.pow(6, raman_sign)
         weight_sum = loss_weight.sum(dim=1, keepdim=True)
         loss_weight = loss_weight/weight_sum
         loss_weighed = torch.sum(loss*loss_weight, dim=1).mean()
@@ -198,7 +199,7 @@ class Experiment(pl.LightningModule):
         loss = F.l1_loss(predicted_spectrum, ramans, reduction="none")
         self.log("val_loss", loss.mean(), on_epoch=True, on_step=False)
         raman_sign = torch.sign(ramans)
-        loss_weight = torch.pow(5, raman_sign)
+        loss_weight = torch.pow(6, raman_sign)
         weight_sum = loss_weight.sum(dim=1, keepdim=True)
         loss_weight = loss_weight/weight_sum
         loss_weighed = torch.sum(loss*loss_weight, dim=1).mean()
@@ -272,8 +273,8 @@ if __name__ == "__main__":
         mode='max',
     )
 
-    train_set = torch.load("materials/JVASP/Train_raman_set_100.pt")
-    validate_set = torch.load("materials/JVASP/Valid_raman_set_100.pt")
+    train_set = torch.load("materials/JVASP/Train_raman_set_50_uneq.pt")
+    validate_set = torch.load("materials/JVASP/Valid_raman_set_50_uneq.pt")
     train_dataloader = DataLoader(
         dataset=train_set, batch_size=128, num_workers=2, shuffle=True)
     validate_dataloader = DataLoader(
