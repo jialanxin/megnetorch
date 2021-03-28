@@ -18,7 +18,7 @@ def ff(input_dim):
 
 
 def ff_output(input_dim, output_dim):
-    return torch.nn.Sequential(torch.nn.Linear(input_dim, 128), torch.nn.GELU(), Dropout(0.1), torch.nn.Linear(128, 64), torch.nn.GELU(), Dropout(0.1), torch.nn.Linear(64, output_dim))
+    return torch.nn.Sequential(torch.nn.Linear(input_dim, 128), torch.nn.RReLU(), Dropout(0.1), torch.nn.Linear(128, 64), torch.nn.RReLU(), Dropout(0.1), torch.nn.Linear(64, output_dim))
 
 
 class Experiment(pl.LightningModule):
@@ -27,7 +27,7 @@ class Experiment(pl.LightningModule):
         self.save_hyperparameters()
         self.lr = lr
         fmten_model = FmtEn.load_from_checkpoint(
-            "pretrain/fmten/epoch=329-step=166319.ckpt")
+            "pretrain/fmten/epoch=970-step=489383.ckpt")
         spgp_model = SPGP.load_from_checkpoint(
             "pretrain/spacegroup/epoch=716-step=361367.ckpt")
         self.atom_embedding = fmten_model.atom_embedding
@@ -36,7 +36,7 @@ class Experiment(pl.LightningModule):
         self.mendeleev_number_embedding = fmten_model.mendeleev_number_embedding
         self.position_embedding = spgp_model.position_embedding
         self.lattice_embedding = spgp_model.lattice_embedding
-        self.encoder = spgp_model.encoder
+        self.encoder = fmten_model.encoder
         self.readout = ff_output(input_dim=128, output_dim=50)
 
     @staticmethod
@@ -164,7 +164,7 @@ class Experiment(pl.LightningModule):
         Precision = true_positive/(true_positive+false_positive)
         Recall = true_positive/(true_positive+false_negative)
         F1score = 2*Precision*Recall/(Precision+Recall)
-        print(f"A:{Accuracy} P:{Precision} R:{Recall} F:{F1score}")
+        # print(f"A:{Accuracy} P:{Precision} R:{Recall} F:{F1score}")
         return Accuracy,Precision,Recall,F1score
 
     def training_step(self, batch, batch_idx):
@@ -173,7 +173,7 @@ class Experiment(pl.LightningModule):
         loss = F.l1_loss(predicted_spectrum, ramans, reduction="none")
         self.log("train_loss", loss.mean(), on_epoch=True, on_step=False)
         raman_sign = torch.sign(ramans)
-        loss_weight = torch.pow(6, raman_sign)
+        loss_weight = torch.pow(5, raman_sign)
         weight_sum = loss_weight.sum(dim=1, keepdim=True)
         loss_weight = loss_weight/weight_sum
         loss_weighed = torch.sum(loss*loss_weight, dim=1).mean()
@@ -199,7 +199,7 @@ class Experiment(pl.LightningModule):
         loss = F.l1_loss(predicted_spectrum, ramans, reduction="none")
         self.log("val_loss", loss.mean(), on_epoch=True, on_step=False)
         raman_sign = torch.sign(ramans)
-        loss_weight = torch.pow(6, raman_sign)
+        loss_weight = torch.pow(5, raman_sign)
         weight_sum = loss_weight.sum(dim=1, keepdim=True)
         loss_weight = loss_weight/weight_sum
         loss_weighed = torch.sum(loss*loss_weight, dim=1).mean()
@@ -268,9 +268,9 @@ if __name__ == "__main__":
     prefix = config["prefix"]
 
     checkpoint_callback = ModelCheckpoint(
-        monitor='val_f1',
+        monitor='val_loss_weighed',
         save_top_k=3,
-        mode='max',
+        mode='min',
     )
 
     train_set = torch.load("materials/JVASP/Train_raman_set_50_uneq.pt")
