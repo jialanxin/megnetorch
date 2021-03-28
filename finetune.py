@@ -29,7 +29,7 @@ class Experiment(pl.LightningModule):
         fmten_model = FmtEn.load_from_checkpoint(
             "pretrain/fmten/epoch=970-step=489383.ckpt")
         spgp_model = SPGP.load_from_checkpoint(
-            "pretrain/spacegroup/epoch=716-step=361367.ckpt")
+            "pretrain/spacegroup/epoch=450-step=227303.ckpt")
         self.atom_embedding = fmten_model.atom_embedding
         self.atomic_number_embedding = fmten_model.atomic_number_embedding
         self.space_group_number_embedding = fmten_model.space_group_number_embedding
@@ -173,7 +173,7 @@ class Experiment(pl.LightningModule):
         loss = F.l1_loss(predicted_spectrum, ramans, reduction="none")
         self.log("train_loss", loss.mean(), on_epoch=True, on_step=False)
         raman_sign = torch.sign(ramans)
-        loss_weight = torch.pow(5, raman_sign)
+        loss_weight = torch.pow(4, raman_sign)
         weight_sum = loss_weight.sum(dim=1, keepdim=True)
         loss_weight = loss_weight/weight_sum
         loss_weighed = torch.sum(loss*loss_weight, dim=1).mean()
@@ -199,7 +199,7 @@ class Experiment(pl.LightningModule):
         loss = F.l1_loss(predicted_spectrum, ramans, reduction="none")
         self.log("val_loss", loss.mean(), on_epoch=True, on_step=False)
         raman_sign = torch.sign(ramans)
-        loss_weight = torch.pow(5, raman_sign)
+        loss_weight = torch.pow(4, raman_sign)
         weight_sum = loss_weight.sum(dim=1, keepdim=True)
         loss_weight = loss_weight/weight_sum
         loss_weighed = torch.sum(loss*loss_weight, dim=1).mean()
