@@ -21,7 +21,7 @@ def ff_output(input_dim, output_dim):
 
 
 class Experiment(pl.LightningModule):
-    def __init__(self, num_enc=6, optim_type="Adam", lr=1e-3, weight_decay=0.0):
+    def __init__(self, optim_type="Adam", lr=1e-3, weight_decay=0.0):
         super().__init__()
         self.save_hyperparameters()
         self.lr = lr
@@ -36,6 +36,10 @@ class Experiment(pl.LightningModule):
         self.position_embedding = spgp_model.position_embedding
         self.lattice_embedding = spgp_model.lattice_embedding
         self.encoder = spgp_model.encoder
+        encode_layer = torch.nn.TransformerEncoderLayer(
+            d_model=128, nhead=8, dim_feedforward=512)
+        self.more_encoder = torch.nn.TransformerEncoder(
+            encode_layer, num_layers=2)
         self.readout = ff_output(input_dim=128, output_dim=1)
 
     @staticmethod
@@ -126,6 +130,7 @@ class Experiment(pl.LightningModule):
 
         # (1+max_atoms, batch_size, atoms_info)
         atoms = self.encoder(src=atoms, src_key_padding_mask=padding_mask)
+        atoms = self.more_encoder(src=atoms,src_key_padding_mask=padding_mask)
 
         system_out = atoms[0]  # (batch_size,atoms_info)
 
