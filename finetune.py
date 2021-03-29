@@ -4,6 +4,8 @@ import torch
 import torch.nn.functional as F
 import yaml
 import pytorch_lightning as pl
+import warnings
+from warnings import warn
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
 from torch.utils.data import DataLoader
@@ -37,7 +39,7 @@ class Experiment(pl.LightningModule):
         self.position_embedding = spgp_model.position_embedding
         self.lattice_embedding = spgp_model.lattice_embedding
         self.encoder = spgp_model.encoder
-        self.readout = ff_output(input_dim=128, output_dim=50)
+        self.readout = ff_output(input_dim=128, output_dim=25)
 
     @staticmethod
     def Gassian_expand(value_list, min_value, max_value, intervals, expand_width, device):
@@ -164,6 +166,7 @@ class Experiment(pl.LightningModule):
         Precision = true_positive/(true_positive+false_positive)
         Recall = true_positive/(true_positive+false_negative)
         F1score = 2*Precision*Recall/(Precision+Recall)
+        # print(f"A:{Accuracy} P:{Precision} R:{Recall} F:{F1score}")
         return Accuracy,Precision,Recall,F1score
 
     def training_step(self, batch, batch_idx):
@@ -172,7 +175,7 @@ class Experiment(pl.LightningModule):
         loss = F.l1_loss(predicted_spectrum, ramans, reduction="none")
         self.log("train_loss", loss.mean(), on_epoch=True, on_step=False)
         raman_sign = torch.sign(ramans)
-        loss_weight = torch.pow(3, raman_sign)
+        loss_weight = torch.pow(2, raman_sign)
         weight_sum = loss_weight.sum(dim=1, keepdim=True)
         loss_weight = loss_weight/weight_sum
         loss_weighed = torch.sum(loss*loss_weight, dim=1).mean()
@@ -183,11 +186,22 @@ class Experiment(pl.LightningModule):
         self.log("train_loss_round", loss_round, on_epoch=True, on_step=False)
         spectrum_sign = torch.sign(spectrum_round)
         acc,prc,rec,f1 = self.scores(spectrum_sign,raman_sign)
-        self.log("train_acc", acc, on_epoch=True, on_step=False)
-        self.log("train_prc", prc, on_epoch=True, on_step=False)
-        self.log("train_rec", rec, on_epoch=True, on_step=False)
-        self.log("train_f1", f1, on_epoch=True, on_step=False)
+        NaNcheck = torch.logical_or(prc.isnan(),rec.isnan())
+        NaNcheck = torch.logical_or(NaNcheck,f1.isnan())
+        if NaNcheck.item() == False:
+            self.log("train_acc", acc, on_epoch=True, on_step=False)
+            self.log("train_prc", prc, on_epoch=True, on_step=False)
+            self.log("train_rec", rec, on_epoch=True, on_step=False)
+            self.log("train_f1", f1, on_epoch=True, on_step=False)
+        else:
+            raise RuntimeError("NaN")
+            # # for layer in self.readout:
+            # #     if hasattr(layer,"reset_parameters"):
+            # #         layer.reset_parameters()
+            # print("Find NaN, triple loss")
+            # loss_weighed = loss_weighed*3
         return loss_weighed
+
 
     def validation_step(self, batch, batch_idx):
         _, ramans = batch
@@ -195,7 +209,7 @@ class Experiment(pl.LightningModule):
         loss = F.l1_loss(predicted_spectrum, ramans, reduction="none")
         self.log("val_loss", loss.mean(), on_epoch=True, on_step=False)
         raman_sign = torch.sign(ramans)
-        loss_weight = torch.pow(3, raman_sign)
+        loss_weight = torch.pow(2, raman_sign)
         weight_sum = loss_weight.sum(dim=1, keepdim=True)
         loss_weight = loss_weight/weight_sum
         loss_weighed = torch.sum(loss*loss_weight, dim=1).mean()
@@ -206,10 +220,15 @@ class Experiment(pl.LightningModule):
         self.log("val_loss_round", loss_round, on_epoch=True, on_step=False)
         spectrum_sign = torch.sign(spectrum_round)
         acc,prc,rec,f1 = self.scores(spectrum_sign,raman_sign)
-        self.log("val_acc", acc, on_epoch=True, on_step=False)
-        self.log("val_prc", prc, on_epoch=True, on_step=False)
-        self.log("val_rec", rec, on_epoch=True, on_step=False)
-        self.log("val_f1", f1, on_epoch=True, on_step=False)
+        NaNcheck = torch.logical_or(prc.isnan(),rec.isnan())
+        NaNcheck = torch.logical_or(NaNcheck,f1.isnan())
+        if NaNcheck.item() == False:
+            self.log("val_acc", acc, on_epoch=True, on_step=False)
+            self.log("val_prc", prc, on_epoch=True, on_step=False)
+            self.log("val_rec", rec, on_epoch=True, on_step=False)
+            self.log("val_f1", f1, on_epoch=True, on_step=False)
+        else:
+            warn("Find NaN")
         return loss_weighed
 
     def configure_optimizers(self):
@@ -259,15 +278,16 @@ if __name__ == "__main__":
     with open(path_to_file, "r") as f:
         config = yaml.load(f.read(), Loader=yaml.BaseLoader)
     prefix = config["prefix"]
+    warnings.simplefilter('always', UserWarning)
 
     checkpoint_callback = ModelCheckpoint(
-        monitor='val_f1',
+        monitor='val_loss_weighed',
         save_top_k=3,
-        mode='max',
+        mode='min',
     )
 
-    train_set = torch.load("materials/JVASP/Train_raman_set.pt")
-    validate_set = torch.load("materials/JVASP/Valid_raman_set.pt")
+    train_set = torch.load("materials/JVASP/Train_raman_set_25_uneq.pt")
+    validate_set = torch.load("materials/JVASP/Valid_raman_set_25_uneq.pt")
     train_dataloader = DataLoader(
         dataset=train_set, batch_size=128, num_workers=2, shuffle=True)
     validate_dataloader = DataLoader(

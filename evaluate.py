@@ -20,7 +20,7 @@ class Experiment(Finetune):
         self.save_hyperparameters()
         self.lr = lr
         pretrain_model = Finetune.load_from_checkpoint(
-            "pretrain/finetuned/epoch=3069-step=174989.ckpt")
+            "pretrain/finetuned/epoch=3467-step=197675.ckpt")
         self.atom_embedding = pretrain_model.atom_embedding
         self.atomic_number_embedding = pretrain_model.atomic_number_embedding
         self.mendeleev_number_embedding = pretrain_model.mendeleev_number_embedding
@@ -97,8 +97,8 @@ if __name__ == "__main__":
     predict = predicts[index].flatten()
     mp_id = mp_id[index][0]
     fig2 = go.Figure()
-    fig2.add_trace(go.Scatter(x=np.linspace(100,1178,50),y=raman,name="lable"))
-    fig2.add_trace(go.Scatter(x=np.linspace(100,1178,50),y=predict,name="predict"))
+    fig2.add_trace(go.Bar(x=np.linspace(100,1178,50),y=raman,name="lable"))
+    fig2.add_trace(go.Bar(x=np.linspace(100,1178,50),y=predict,name="predict"))
     st.write(fig2)
     st.write(f"loss:{loss[index]}")
     st.write(f"mp_link : https://www.materialsproject.org/materials/mp-{mp_id}")
