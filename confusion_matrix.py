@@ -17,7 +17,7 @@ class Experiment(Finetune):
         self.save_hyperparameters()
         self.lr = lr
         pretrain_model = Finetune.load_from_checkpoint(
-            "pretrain/finetuned/epoch=3467-step=197675.ckpt")
+            "pretrain/finetuned/epoch=2894-step=165014.ckpt")
         self.atom_embedding = pretrain_model.atom_embedding
         self.atomic_number_embedding = pretrain_model.atomic_number_embedding
         self.mendeleev_number_embedding = pretrain_model.mendeleev_number_embedding
@@ -47,14 +47,14 @@ def hist_count(num,raman,predicted_spectrum):
 
 
 if __name__ == "__main__":
-    train_set = torch.load("materials/JVASP/Train_raman_set.pt")
-    validate_set = torch.load("materials/JVASP/Valid_raman_set.pt")
+    train_set = torch.load("materials/JVASP/Train_raman_set_25_uneq.pt")
+    validate_set = torch.load("materials/JVASP/Valid_raman_set_25_uneq.pt")
     train_dataloader = DataLoader(
         dataset=train_set, batch_size=64, num_workers=1)
     validate_dataloader = DataLoader(
         dataset=validate_set, batch_size=64, num_workers=1)
     model = Experiment().eval()
-    for i,data in enumerate(train_dataloader):
+    for i,data in enumerate(validate_dataloader):
         _,raman = data
         predicted_spectrum =  model(data)
         hist = hist_count(0,raman,predicted_spectrum)
@@ -171,14 +171,14 @@ if __name__ == "__main__":
 
 # Train:  loss_weight_3_sign
 # label\predict:          0,      1,      2,
-# 0,                 0.9537, 0.0445, 0.0017
-# 1,                 0.1383, 0.8405, 0.0210
-# 2,                 0.1371, 0.8382, 0.0244
+# 0,                 0.9516, 0.0478, 0.0005
+# 1,                 0.1304, 0.8682, 0.0012
+# 2,                 0.1305, 0.8619, 0.0075
 # Validate:
 # label\predict:            0,      1,      2,
-# 0,                   0.9153, 0.0726, 0.0095
-# 1,                   0.3295, 0.5409, 0.1000
-# 2,                   0.3268, 0.5204, 0.1131
+# 0,                   0.8838, 0.1016, 0.0126
+# 1,                   0.4893, 0.4397, 0.0637
+# 2,                   0.4706, 0.4479, 0.0076
 
 # Train:  loss_weight_1_sign_pure_l1loss
 # label\predict:          0,      1,      2,
