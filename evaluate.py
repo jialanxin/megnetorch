@@ -36,8 +36,8 @@ class Experiment(Finetune):
         return spectrum_round
 
 
-def load_dataset():
-    with open("materials/JVASP/Valid_set_25_uneq.json", "r") as f:
+def load_dataset(Train_or_Valid="Valid"):
+    with open(f"materials/JVASP/{Train_or_Valid}_set_25_uneq.json", "r") as f:
         data = json.loads(f.read())
     dataset = RamanFormularDataset(data)
     return dataset
@@ -64,8 +64,8 @@ class RamanFormularDataset(StructureRamanDataset):
         return couples
 
 
-def save_loss_formula():
-    dataset = load_dataset()
+def save_loss_formula(Train_or_Valid="Valid"):
+    dataset = load_dataset(Train_or_Valid)
     dataloader = DataLoader(dataset=dataset, batch_size=1)
     model = Experiment()
     formula_list = []
@@ -76,37 +76,64 @@ def save_loss_formula():
         graph, ramans, formula = data
         input = (graph, ramans)
         predicted_spectrum = model(input)
-        loss = F.l1_loss(predicted_spectrum, ramans)
+        loss = F.l1_loss(predicted_spectrum, ramans, reduction="none")
+        raman_sign = torch.sign(ramans)
+        loss_weight = torch.pow(3, raman_sign)
+        weight_sum = loss_weight.sum(dim=1, keepdim=True)
+        loss_weight = loss_weight/weight_sum
+        loss_weighed = torch.sum(loss*loss_weight, dim=1).mean()
         formula_list.append(formula[0])
-        loss_list.append(loss.item())
+        loss_list.append(loss_weighed.item())
         raman_list.append(ramans.detach().numpy())
         predict_list.append(predicted_spectrum.detach().numpy())
     torch.save({"loss": loss_list, "formula": formula_list, "raman": raman_list,
-                "predict": predict_list}, "materials/JVASP/loss_formula.pt")
+                "predict": predict_list}, f"materials/JVASP/{Train_or_Valid}_loss_formula.pt")
 
 
-def load_loss_formula():
-    data = torch.load("materials/JVASP/loss_formula.pt")
+def load_loss_formula(Train_or_Valid="Valid"):
+    data = torch.load(f"materials/JVASP/{Train_or_Valid}_loss_formula.pt")
     return data["loss"], data["formula"], data["raman"], data["predict"]
 
 
-if __name__ == "__main__":
-    # save_loss_formula()
-    loss, formula, ramams, predicts = load_loss_formula()
+def plot_points(Train_or_Valid="Valid"):
+    loss, formula, _, _ = load_loss_formula(Train_or_Valid)
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=formula, y=loss, mode="markers"))
-    st.write(fig)
-    word = st.text_input("Insert a formula", "Na6 Bi2")
-    index = formula.index(word)
-    raman = ramams[index].flatten()
-    predict = predicts[index].flatten()
-    fig2 = go.Figure()
+    fig.add_trace(go.Scatter(x=formula, y=loss, mode="markers",
+                             marker=dict(size=5 if Train_or_Valid == "Valid" else 2)))
+    return fig
+
+
+def search_formula(formula, Train_or_Valid="Valid"):
+    loss, formula_list, raman, predict = load_loss_formula(Train_or_Valid)
+    index = formula_list.index(formula)
+    raman = raman[index][0]
+    predict = predict[index][0]
+    loss = loss[index]
+    fig = go.Figure()
     x = np.array([100, 110,  120, 131,  143,  155,  167,  180,  194,  209,  226,  241,
                   259,  277,  297,  322,  347,  375,  406,  440,  478,  528,  587,  685,  844, 1100])
     x_left = x[:-1]
     x_right = x[1:]
     x = (x_left+x_right)/2
-    fig2.add_trace(go.Bar(x=x, y=raman, name="lable"))
-    fig2.add_trace(go.Bar(x=x, y=predict, name="predict"))
-    st.write(fig2)
-    st.write(f"loss:{loss[index]}")
+    fig.add_trace(go.Bar(x=x, y=raman, name="lable"))
+    fig.add_trace(go.Bar(x=x, y=predict, name="predict"))
+    return fig, loss
+
+
+if __name__ == "__main__":
+    # save_loss_formula("Train")
+    # save_loss_formula("Valid")
+    st.header("Loss of Validation Set")
+    fig_valid = plot_points("Valid")
+    st.write(fig_valid)
+    formula_valid = st.text_input("Insert a formula", "Si3 O6")
+    fig_valid_search, loss_valid = search_formula(formula_valid, "Valid")
+    st.write(fig_valid_search)
+    st.write(f"loss:{loss_valid}")
+    st.header("Loss of Train Set")
+    fig_train = plot_points("Train")
+    st.write(fig_train)
+    formula_train = st.text_input("Insert a formula", "Na6 S2 O9")
+    fig_train_search, loss_train = search_formula(formula_train, "Train")
+    st.write(fig_train_search)
+    st.write(f"loss:{loss_train}")
