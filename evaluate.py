@@ -21,7 +21,7 @@ class Experiment(Finetune):
         self.save_hyperparameters()
         self.lr = lr
         pretrain_model = Finetune.load_from_checkpoint(
-            "pretrain/finetuned/epoch=2894-step=165014.ckpt")
+            "pretrain/finetuned/epoch=3665-step=208961.ckpt")
         self.atom_embedding = pretrain_model.atom_embedding
         self.atomic_number_embedding = pretrain_model.atomic_number_embedding
         self.mendeleev_number_embedding = pretrain_model.mendeleev_number_embedding
@@ -32,12 +32,11 @@ class Experiment(Finetune):
 
     def forward(self, batch):
         predicted_spectrum = self.shared_procedure(batch)
-        spectrum_round = torch.round(predicted_spectrum)
-        return spectrum_round
+        return predicted_spectrum
 
 
 def load_dataset(Train_or_Valid="Valid"):
-    with open(f"materials/JVASP/{Train_or_Valid}_set_25_uneq.json", "r") as f:
+    with open(f"materials/JVASP/{Train_or_Valid}_set_25_uneq_yolov1.json", "r") as f:
         data = json.loads(f.read())
     dataset = RamanFormularDataset(data)
     return dataset
@@ -76,22 +75,17 @@ def save_loss_formula(Train_or_Valid="Valid"):
         graph, ramans, formula = data
         input = (graph, ramans)
         predicted_spectrum = model(input)
-        loss = F.l1_loss(predicted_spectrum, ramans, reduction="none")
-        raman_sign = torch.sign(ramans)
-        loss_weight = torch.pow(3, raman_sign)
-        weight_sum = loss_weight.sum(dim=1, keepdim=True)
-        loss_weight = loss_weight/weight_sum
-        loss_weighed = torch.sum(loss*loss_weight, dim=1).mean()
+        loss = Experiment.yolov1_loss(ramans,predicted_spectrum)
         formula_list.append(formula[0])
-        loss_list.append(loss_weighed.item())
+        loss_list.append(loss.item())
         raman_list.append(ramans.detach().numpy())
         predict_list.append(predicted_spectrum.detach().numpy())
     torch.save({"loss": loss_list, "formula": formula_list, "raman": raman_list,
-                "predict": predict_list}, f"materials/JVASP/{Train_or_Valid}_loss_formula.pt")
+                "predict": predict_list}, f"materials/JVASP/{Train_or_Valid}_loss_formula_yolo.pt")
 
 
 def load_loss_formula(Train_or_Valid="Valid"):
-    data = torch.load(f"materials/JVASP/{Train_or_Valid}_loss_formula.pt")
+    data = torch.load(f"materials/JVASP/{Train_or_Valid}_loss_formula_yolo.pt")
     return data["loss"], data["formula"], data["raman"], data["predict"]
 
 
@@ -102,21 +96,36 @@ def plot_points(Train_or_Valid="Valid"):
                              marker=dict(size=5 if Train_or_Valid == "Valid" else 2)))
     return fig
 
+def process_y(x,raman,cut_off=0.5):
+    edge = np.array([100, 110,  120, 131,  143,  155,  167,  180,  194,  209,  226,  241,
+                  259,  277,  297,  322,  347,  375,  406,  440,  478,  528,  587,  685,  844, 1100])
+    left = edge[:-1]
+    right = edge[1:]
+    edge_range = right-left
+    confidence = raman[:,0]
+    position = raman[:,1]
+    absolute_position = position*edge_range+left
+    y = np.zeros_like(x)
+    for confidence, abs_pos in zip(confidence,absolute_position):
+        if confidence <= cut_off:
+            continue
+        else:
+            y += confidence*np.exp(-(x-abs_pos)**2/2/0.5**2)
+    return y
 
-def search_formula(formula, Train_or_Valid="Valid"):
+
+def search_formula(formula, Train_or_Valid="Valid",cut_off=0.5):
     loss, formula_list, raman, predict = load_loss_formula(Train_or_Valid)
     index = formula_list.index(formula)
     raman = raman[index][0]
     predict = predict[index][0]
     loss = loss[index]
     fig = go.Figure()
-    x = np.array([100, 110,  120, 131,  143,  155,  167,  180,  194,  209,  226,  241,
-                  259,  277,  297,  322,  347,  375,  406,  440,  478,  528,  587,  685,  844, 1100])
-    x_left = x[:-1]
-    x_right = x[1:]
-    x = (x_left+x_right)/2
-    fig.add_trace(go.Bar(x=x, y=raman, name="lable"))
-    fig.add_trace(go.Bar(x=x, y=predict, name="predict"))
+    x = np.linspace(100,1100,10000)
+    raman = process_y(x,raman)
+    predict = process_y(x,predict,cut_off)
+    fig.add_trace(go.Scatter(x=x, y=raman, name="lable"))
+    fig.add_trace(go.Scatter(x=x, y=predict, name="predict"))
     return fig, loss
 
 
@@ -126,14 +135,16 @@ if __name__ == "__main__":
     st.header("Loss of Validation Set")
     fig_valid = plot_points("Valid")
     st.write(fig_valid)
-    formula_valid = st.text_input("Insert a formula", "Si3 O6")
-    fig_valid_search, loss_valid = search_formula(formula_valid, "Valid")
+    formula_valid = st.text_input("Insert a formula", "Ta4 Si2")
+    cut_off_valid = st.slider("ignore confidence under cutoff", min_value=0.0, max_value=1.0, value=0.5, key="Valid")
+    fig_valid_search, loss_valid = search_formula(formula_valid, "Valid",cut_off_valid)
     st.write(fig_valid_search)
     st.write(f"loss:{loss_valid}")
     st.header("Loss of Train Set")
     fig_train = plot_points("Train")
     st.write(fig_train)
-    formula_train = st.text_input("Insert a formula", "Na6 S2 O9")
-    fig_train_search, loss_train = search_formula(formula_train, "Train")
+    formula_train = st.text_input("Insert a formula", "As4")
+    cut_off_train = st.slider("ignore confidence under cutoff", min_value=0.0, max_value=1.0, value=0.5, key="Train")
+    fig_train_search, loss_train = search_formula(formula_train, "Train",cut_off_train)
     st.write(fig_train_search)
     st.write(f"loss:{loss_train}")
