@@ -206,7 +206,7 @@ class Experiment(pl.LightningModule):
         object_confidence_loss = F.mse_loss(
             object_confidence_target, object_predict[:, 0], reduction="sum")
 
-        loss = 0.1*nonobject_confidence_loss + \
+        loss = 0.2*nonobject_confidence_loss + \
             object_confidence_loss+5*object_position_loss
         loss = loss/batch_size
         return loss

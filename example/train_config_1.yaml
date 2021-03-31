@@ -1,5 +1,5 @@
 prefix:
-  "gdrive/MyDrive/Raman_machine_learning/models/v0.4.6/4.finetune_yolo/"
+  "gdrive/MyDrive/Raman_machine_learning/models/v0.4.6/5.finetune_yolo_nonobj_0.2/"
 trainer: "fit"
 optimizer:
         lr: 5e-4
