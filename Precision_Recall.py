@@ -12,6 +12,7 @@ from dataset import StructureRamanDataset
 from finetune import Experiment as Finetune
 import numpy as np
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots 
 
 class Experiment(Finetune):
     def __init__(self, num_enc=6, optim_type="Adam", lr=1e-3, weight_decay=0.0):
@@ -19,7 +20,7 @@ class Experiment(Finetune):
         self.save_hyperparameters()
         self.lr = lr
         pretrain_model = Finetune.load_from_checkpoint(
-            "pretrain/finetuned/epoch=3665-step=208961.ckpt")
+            "pretrain/finetuned/epoch=3535-step=201551.ckpt")
         self.atom_embedding = pretrain_model.atom_embedding
         self.atomic_number_embedding = pretrain_model.atomic_number_embedding
         self.mendeleev_number_embedding = pretrain_model.mendeleev_number_embedding
@@ -47,9 +48,9 @@ if __name__ == "__main__":
     for i,data in enumerate(validate_dataloader):
         _,raman = data
         predicted_spectrum =  model(data)
-        predict_confidence = predicted_spectrum[:,:,0]
+        predict_confidence = predicted_spectrum[:,:,0].clone()
         target_confidence = raman[:,:,0]
-    cut_off_list = np.linspace(0.4,0.8,40)
+    cut_off_list = np.linspace(0.2,0.8,60)
     Ac_list = np.array([])
     Pr_list = np.array([])
     Rc_list = np.array([])
@@ -59,15 +60,17 @@ if __name__ == "__main__":
         predict_confidence[less] = 0
         predict_confidence[torch.logical_not(less)] = 1
         Accuracy, Precision,Recall,F1Score = Experiment.scores(predict_confidence,target_confidence)
+        predict_confidence = predicted_spectrum[:,:,0].clone()
         Ac_list = np.append(Ac_list,Accuracy.item())
         Pr_list = np.append(Pr_list,Precision.item())
         Rc_list = np.append(Rc_list,Recall.item())
         F1_list = np.append(F1_list,F1Score.item())
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=cut_off_list,y=Ac_list,name="Accuracy"))
-    fig.add_trace(go.Scatter(x=cut_off_list,y=Pr_list,name="Precision"))
-    fig.add_trace(go.Scatter(x=cut_off_list,y=Rc_list,name="Recall"))
-    fig.add_trace(go.Scatter(x=cut_off_list,y=F1_list,name="F1Score"))
+    fig = make_subplots(rows=1,cols=2)
+    fig.add_trace(go.Scatter(x=cut_off_list,y=Ac_list,name="Accuracy"),row=1,col=1)
+    fig.add_trace(go.Scatter(x=cut_off_list,y=Pr_list,name="Precision"),row=1,col=1)
+    fig.add_trace(go.Scatter(x=cut_off_list,y=Rc_list,name="Recall"),row=1,col=1)
+    fig.add_trace(go.Scatter(x=cut_off_list,y=F1_list,name="F1Score"),row=1,col=1)
+    fig.add_trace(go.Scatter(x=Rc_list,y=Pr_list,name="Pr-Rc"),row=1,col=2)
     fig.show()
 
 # Train:  loss_weight_6_sign
@@ -75,6 +78,10 @@ if __name__ == "__main__":
 # Validate:
 # Accuracy: 85% Precision: 44% Recall: 78% F1Score: 55
 
-# nonobj:0.1
+# nonobj:0.1 cut_off 0.4
 # Validate:
-# Accuracy: 78% Precision: 49% Recall: 78% F1Score: 60
+# Accuracy: 79% Precision: 49% Recall: 78% F1Score: 60
+
+# nonobj:0.2 cut_off 0.44
+# Validate:
+# Accuracy: 81% Precision: 53% Recall: 71% F1Score: 61
