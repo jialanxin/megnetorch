@@ -20,7 +20,7 @@ def ff(input_dim):
 
 
 def ff_output(input_dim, output_dim):
-    return torch.nn.Sequential(torch.nn.Linear(input_dim, 128), torch.nn.RReLU(), Dropout(0.1), torch.nn.Linear(128, 64), torch.nn.RReLU(), Dropout(0.1), torch.nn.Linear(64, output_dim))
+    return torch.nn.Sequential(torch.nn.Linear(input_dim, 128), torch.nn.RReLU(), Dropout(0.2), torch.nn.Linear(128, 64), torch.nn.RReLU(), Dropout(0.2), torch.nn.Linear(64, output_dim))
 
 
 class Experiment(pl.LightningModule):
