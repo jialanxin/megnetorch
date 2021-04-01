@@ -10,6 +10,9 @@ from torch.utils.data import DataLoader
 from torch.nn import Embedding, RReLU, ReLU, Dropout
 from dataset import StructureRamanDataset
 from finetune import Experiment as Finetune
+import numpy as np
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots 
 
 class Experiment(Finetune):
     def __init__(self, num_enc=6, optim_type="Adam", lr=1e-3, weight_decay=0.0):
@@ -17,7 +20,7 @@ class Experiment(Finetune):
         self.save_hyperparameters()
         self.lr = lr
         pretrain_model = Finetune.load_from_checkpoint(
-            "pretrain/finetuned/epoch=3711-step=211583.ckpt")
+            "pretrain/finetuned/epoch=3535-step=201551.ckpt")
         self.atom_embedding = pretrain_model.atom_embedding
         self.atomic_number_embedding = pretrain_model.atomic_number_embedding
         self.mendeleev_number_embedding = pretrain_model.mendeleev_number_embedding
@@ -29,67 +32,56 @@ class Experiment(Finetune):
 
     def forward(self, batch):
         predicted_spectrum = self.shared_procedure(batch)
-        spectrum_round = torch.round(predicted_spectrum)
-        return spectrum_round
-
-def hist_count(num,raman,predicted_spectrum):
-    where_num = torch.eq(raman,num*torch.ones_like(raman))
-    predict_where_num = predicted_spectrum[where_num]
-    count = predict_where_num.shape[0]
-    if count != 0:
-        hist = torch.histc(predict_where_num,bins=3,min=0,max=2)
-        hist = hist/count
-    else:
-        hist = torch.zeros((3,))
-    return hist
+        return predicted_spectrum
     
 
 
 
 if __name__ == "__main__":
-    train_set = torch.load("materials/JVASP/Train_raman_set.pt")
-    validate_set = torch.load("materials/JVASP/Valid_raman_set.pt")
-    train_dataloader = DataLoader(
-        dataset=train_set, batch_size=64, num_workers=1)
+    # train_set = torch.load("materials/JVASP/Train_raman_set_25_uneq_yolov1.pt")
+    validate_set = torch.load("materials/JVASP/Valid_raman_set_25_uneq_yolov1.pt")
+    # # train_dataloader = DataLoader(
+    # #     dataset=train_set, batch_size=64, num_workers=1)
     validate_dataloader = DataLoader(
-        dataset=validate_set, batch_size=64, num_workers=1)
+        dataset=validate_set, batch_size=len(validate_set), num_workers=1)
     model = Experiment().eval()
     for i,data in enumerate(validate_dataloader):
         _,raman = data
         predicted_spectrum =  model(data)
-        where_zero = torch.eq(raman,torch.zeros_like(raman))
-        predict_where_zero = predicted_spectrum[where_zero]
-        true_negative = torch.eq(predict_where_zero,torch.zeros_like(predict_where_zero)) #0->0
-        false_positive = torch.logical_not(true_negative)                                 #0->1
-        true_negative = true_negative.float().sum(dim=0,keepdim=True)
-        false_positive = false_positive.float().sum(dim=0,keepdim=True)
-        where_one = torch.logical_not(where_zero)
-        predict_where_one = predicted_spectrum[where_one]                                 
-        false_negative = torch.eq(predict_where_one,torch.zeros_like(predict_where_one))  #1->0
-        true_positive =  torch.logical_not(false_negative)                                #1->1
-        false_negative = false_negative.float().sum(dim=0,keepdim=True)
-        true_positive = true_positive.float().sum(dim=0,keepdim=True)
-        Accuracy = (true_positive+true_negative)/(true_positive+true_negative+false_positive+false_negative)
-        Precision = true_positive/(true_positive+false_positive)
-        Recall = true_positive/(true_positive+false_negative)
-        F1Score = 2*Precision*Recall/(Precision+Recall)
-        if i == 0:
-            Ac_list = Accuracy
-            Pr_list = Precision
-            Rc_list = Recall
-            F1_list = F1Score
-        else:
-            Ac_list = torch.cat((Ac_list,Accuracy),dim=0)
-            Pr_list = torch.cat((Pr_list,Precision),dim=0)
-            Rc_list = torch.cat((Rc_list,Recall),dim=0)
-            F1_list = torch.cat((F1_list,F1Score),dim=0)
-    Accuracy = Ac_list.mean().item()
-    Precision = Pr_list.mean().item()
-    Recall = Rc_list.mean().item()
-    F1Score = F1_list.mean().item()
-    print(f"Accuracy:{Accuracy}\nPrcision:{Precision}\nRecall:{Recall}\nF1Score:{F1Score}")
+        predict_confidence = predicted_spectrum[:,:,0].clone()
+        target_confidence = raman[:,:,0]
+    cut_off_list = np.linspace(0.2,0.8,60)
+    Ac_list = np.array([])
+    Pr_list = np.array([])
+    Rc_list = np.array([])
+    F1_list = np.array([])
+    for cut_off in cut_off_list:
+        less = torch.less_equal(predict_confidence,cut_off)
+        predict_confidence[less] = 0
+        predict_confidence[torch.logical_not(less)] = 1
+        Accuracy, Precision,Recall,F1Score = Experiment.scores(predict_confidence,target_confidence)
+        predict_confidence = predicted_spectrum[:,:,0].clone()
+        Ac_list = np.append(Ac_list,Accuracy.item())
+        Pr_list = np.append(Pr_list,Precision.item())
+        Rc_list = np.append(Rc_list,Recall.item())
+        F1_list = np.append(F1_list,F1Score.item())
+    fig = make_subplots(rows=1,cols=2)
+    fig.add_trace(go.Scatter(x=cut_off_list,y=Ac_list,name="Accuracy"),row=1,col=1)
+    fig.add_trace(go.Scatter(x=cut_off_list,y=Pr_list,name="Precision"),row=1,col=1)
+    fig.add_trace(go.Scatter(x=cut_off_list,y=Rc_list,name="Recall"),row=1,col=1)
+    fig.add_trace(go.Scatter(x=cut_off_list,y=F1_list,name="F1Score"),row=1,col=1)
+    fig.add_trace(go.Scatter(x=Rc_list,y=Pr_list,name="Pr-Rc"),row=1,col=2)
+    fig.show()
 
 # Train:  loss_weight_6_sign
 # Accuracy: 88% Precision: 49% Recall: 90% F1Score: 64
 # Validate:
 # Accuracy: 85% Precision: 44% Recall: 78% F1Score: 55
+
+# nonobj:0.1 cut_off 0.4
+# Validate:
+# Accuracy: 79% Precision: 49% Recall: 78% F1Score: 60
+
+# nonobj:0.2 cut_off 0.44
+# Validate:
+# Accuracy: 81% Precision: 53% Recall: 71% F1Score: 61
