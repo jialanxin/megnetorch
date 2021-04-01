@@ -32,6 +32,12 @@ class Experiment(pl.LightningModule):
         self.encoder = torch.nn.TransformerEncoder(
             encode_layer, num_layers=num_enc)
         self.readout = ff_output(input_dim=256, output_dim=230)
+        self.atom_embedding = ff(459)
+        self.atomic_number_embedding = torch.nn.Embedding(
+            num_embeddings=95, embedding_dim=256, padding_idx=0)
+        self.mendeleev_number_embedding = torch.nn.Embedding(
+            num_embeddings=104, embedding_dim=256, padding_idx=0)
+
 
     @staticmethod
     def Gassian_expand(value_list, min_value, max_value, intervals, expand_width, device):
@@ -42,13 +48,34 @@ class Experiment(pl.LightningModule):
 
     def shared_procedure(self, batch):
         encoded_graph, _ = batch
+        # atoms: (batch_size,max_atoms,59)
+        atoms = encoded_graph["atoms"]
         # padding_mask: (batch_size, max_atoms)
         padding_mask = encoded_graph["padding_mask"]
+        # (batch_size, max_atoms, 1)
+        elecneg = encoded_graph["elecneg"]
+        # (batch_size, max_atoms, 1)
+        covrad = encoded_graph["covrad"]
+        # (batch_size, max_atoms, 1)
+        FIE = encoded_graph["FIE"]
+        # (batch_size, max_atoms, 1)
+        elecaffi = encoded_graph["elecaffi"]
+        # (batch_size, max_atoms, 1)
+        atmwht = encoded_graph["AM"]
 
         # (batch_size, max_atoms, 3)
         positions = encoded_graph["positions"]
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+        elecneg = self.Gassian_expand(elecneg, 0.5, 4.0, 80, 0.04, device)    # (batch_size, max_atoms, 80)
+        covrad = self.Gassian_expand(covrad, 50, 250, 80, 2.5, device)        # (batch_size, max_atoms, 80)
+        FIE = self.Gassian_expand(FIE, 3, 25, 80, 0.28, device)               # (batch_size, max_atoms, 80)
+        elecaffi = self.Gassian_expand(elecaffi, -3, 3.7, 80, 0.08, device)   # (batch_size, max_atoms, 80)
+        atmwht = self.Gassian_expand(atmwht, 0, 210, 80, 2.63, device)        # (batch_size, max_atoms, 80)
+        atoms = torch.cat(
+            (atoms, elecneg, covrad, FIE, elecaffi, atmwht), dim=2)         # (batch_size, max_atoms, 459)
+        atoms = self.atom_embedding(atoms)  # (batch_size,max_atoms,atoms_info)
 
         positions = positions.unsqueeze(dim=3).expand(-1, -1, 3, 80)
         centers = torch.linspace(-15, 18, 80).to(device)
@@ -58,7 +85,15 @@ class Experiment(pl.LightningModule):
         # (batch_size,max_atoms,positions_info)
         positions = self.position_embedding(positions)
 
-        atoms = positions  # (batch_size,max_atoms,atoms_info)
+        atmnb = encoded_graph["AN"]  # (batch_size, max_atoms)
+        atomic_numbers = self.atomic_number_embedding(atmnb)
+
+        mennb = encoded_graph["MN"]  # (batch_size, max_atoms)
+        mendeleev_numbers = self.mendeleev_number_embedding(
+            mennb)  # (batch_size, max_atoms, atoms_info)
+
+        atoms = atoms+atomic_numbers+mendeleev_numbers + \
+            positions  # (batch_size,max_atoms,atoms_info)
 
         lattice = encoded_graph["lattice"]  # lattice: (batch_size, 9, 1)
         lattice = self.Gassian_expand(
