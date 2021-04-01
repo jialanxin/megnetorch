@@ -13,7 +13,7 @@ from torchmetrics.functional import accuracy
 
 
 def ff(input_dim):
-    return torch.nn.Sequential(torch.nn.Linear(input_dim, 128))
+    return torch.nn.Sequential(torch.nn.Linear(input_dim, 256))
 
 
 def ff_output(input_dim, output_dim):
@@ -25,13 +25,13 @@ class Experiment(pl.LightningModule):
         super().__init__()
         self.save_hyperparameters()
         self.lr = lr
-        self.position_embedding = ff(120)
-        self.lattice_embedding = ff(400)
+        self.position_embedding = ff(240)
+        self.lattice_embedding = ff(800)
         encode_layer = torch.nn.TransformerEncoderLayer(
-            d_model=128, nhead=8, dim_feedforward=512)
+            d_model=256, nhead=8, dim_feedforward=1024)
         self.encoder = torch.nn.TransformerEncoder(
             encode_layer, num_layers=num_enc)
-        self.readout = ff_output(input_dim=128, output_dim=230)
+        self.readout = ff_output(input_dim=256, output_dim=230)
 
     @staticmethod
     def Gassian_expand(value_list, min_value, max_value, intervals, expand_width, device):
@@ -50,10 +50,10 @@ class Experiment(pl.LightningModule):
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        positions = positions.unsqueeze(dim=3).expand(-1, -1, 3, 40)
-        centers = torch.linspace(-15, 18, 40).to(device)
-        positions = torch.exp(-(positions - centers)**2/0.83**2)  # (batch_size, max_atoms, 3, 40)
-        positions = torch.flatten(positions, start_dim=2)         # (batch_size, max_atoms, 120)
+        positions = positions.unsqueeze(dim=3).expand(-1, -1, 3, 80)
+        centers = torch.linspace(-15, 18, 80).to(device)
+        positions = torch.exp(-(positions - centers)**2/0.41**2)  # (batch_size, max_atoms, 3, 80)
+        positions = torch.flatten(positions, start_dim=2)         # (batch_size, max_atoms, 240)
 
         # (batch_size,max_atoms,positions_info)
         positions = self.position_embedding(positions)
@@ -62,14 +62,14 @@ class Experiment(pl.LightningModule):
 
         lattice = encoded_graph["lattice"]  # lattice: (batch_size, 9, 1)
         lattice = self.Gassian_expand(
-            lattice, -15, 18, 40, 0.83, device)  # (batch_size, 9, 40)
-        lattice = torch.flatten(lattice, start_dim=1)  # (batch_size,360)
+            lattice, -15, 18, 80, 0.41, device)  # (batch_size, 9, 80)
+        lattice = torch.flatten(lattice, start_dim=1)  # (batch_size,720)
 
         cell_volume = torch.log(encoded_graph["CV"])   # lattice: (batch_size,1,1)
-        cell_volume = self.Gassian_expand(cell_volume,3,8,40,0.13,device) # (batch_size,1,40)
-        cell_volume = torch.flatten(cell_volume,start_dim=1) # (batch_size, 40)
+        cell_volume = self.Gassian_expand(cell_volume,3,8,80,0.06,device) # (batch_size,1,80)
+        cell_volume = torch.flatten(cell_volume,start_dim=1) # (batch_size, 80)
 
-        lattice = torch.cat((lattice,cell_volume),dim=1) # (batch_size, 400)
+        lattice = torch.cat((lattice,cell_volume),dim=1) # (batch_size, 800)
         lattice = self.lattice_embedding(lattice)  # (batch_size,lacttice_info)
         lattice = torch.unsqueeze(lattice, dim=1)  # (batch_size,1,lacttice_info)
 
@@ -170,9 +170,9 @@ if __name__ == "__main__":
     validate_set = torch.load("./materials/mp/Valid_spgp_set.pt")
 
     train_dataloader = DataLoader(
-        dataset=train_set, batch_size=128, num_workers=8)
+        dataset=train_set, batch_size=128, num_workers=2)
     validate_dataloader = DataLoader(
-        dataset=validate_set, batch_size=128, num_workers=8)
+        dataset=validate_set, batch_size=128, num_workers=2)
 
     checkpoint_callback = ModelCheckpoint(
         monitor='val_acc',
