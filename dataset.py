@@ -128,10 +128,10 @@ def prepare_datesets(json_file):
     return dataset
 
 if __name__=="__main__":
-    train_set = prepare_datesets("materials/JVASP/Train_set_25_uneq_yolov1.json")
+    train_set = prepare_datesets("materials/JVASP/Train_unique_mp_id.json")
     print(len(train_set))
     torch.save(train_set,"materials/JVASP/Train_raman_set_25_uneq_yolov1.pt")
 
-    validate_set = prepare_datesets("materials/JVASP/Valid_set_25_uneq_yolov1.json")
+    validate_set = prepare_datesets("materials/JVASP/Valid_unique_mp_id.json")
     print(len(validate_set))
     torch.save(validate_set,"materials/JVASP/Valid_raman_set_25_uneq_yolov1.pt")

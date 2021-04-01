@@ -78,10 +78,10 @@ if __name__ == "__main__":
 # Validate:
 # Accuracy: 85% Precision: 44% Recall: 78% F1Score: 55
 
-# nonobj:0.1 cut_off 0.4
+# nonobj:0.1 cut_off 0.42
 # Validate:
-# Accuracy: 79% Precision: 49% Recall: 78% F1Score: 60
+# Accuracy: 79% Precision: 53% Recall: 75% F1Score: 62
 
-# nonobj:0.2 cut_off 0.44
+# nonobj:0.2 cut_off 0.4
 # Validate:
-# Accuracy: 81% Precision: 53% Recall: 71% F1Score: 61
+# Accuracy: 82% Precision: 55% Recall: 72% F1Score: 62
