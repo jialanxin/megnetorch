@@ -39,7 +39,7 @@ class Experiment(pl.LightningModule):
         self.position_embedding = spgp_model.position_embedding
         self.lattice_embedding = spgp_model.lattice_embedding
         self.encoder = spgp_model.encoder
-        self.readout = ff_output(input_dim=128, output_dim=50)
+        self.readout = ff_output(input_dim=128, output_dim=100)
 
     @staticmethod
     def Gassian_expand(value_list, min_value, max_value, intervals, expand_width, device):
@@ -141,7 +141,7 @@ class Experiment(pl.LightningModule):
         system_out = atoms[0]  # (batch_size,atoms_info)
 
         # (batch_size, wavelength_clips, confidence+position)
-        output_spectrum = self.readout(system_out).reshape(-1, 25, 2)
+        output_spectrum = self.readout(system_out).reshape(-1, 25, 2, 2)
 
         return output_spectrum
 
@@ -177,12 +177,30 @@ class Experiment(pl.LightningModule):
 
     @staticmethod
     def yolov1_loss(raman, predict):
-        confidence_lable = raman[:, :, 0]  # (batch_size, wavelength_clips)
-        batch_size = raman.shape[0]
-        wavelength_clips = raman.shape[1]
-        object_mask = confidence_lable.bool().unsqueeze(
-            dim=2).expand_as(raman)  # (batch_size, wavelength_clips,2)
+        # raman (batch_size, wavelength_clips, 2) # predict (batch_size, wavelength_clips, workers, 2)
+        position_label = raman[:, :, 1]  # (batch_size, wavelength_clips)
+        # (batch_size, wavelength_clips,workers)
+        predict_position = predict[:, :, :, 1]
+        # (batch_size, wavelength_clips,workers)
+        position_label = position_label.unsqueeze(
+            dim=-1).expand_as(predict_position)
+        # (batch_size, wavelength_clips, workers)
+        position_accuracy = 1 - \
+            F.l1_loss(predict_position, position_label, reduction="none")
+        # (batch_size, wavelength_clips, workers)
+        position_prefer_mask = torch.argmax(
+            position_accuracy, dim=2, keepdim=True)
+        position_prefer_mask = position_prefer_mask.unsqueeze(
+            dim=-1).expand_as(predict)  # (batch_size, wavelength_clips, workers, 2)
+        confidence_label = raman[:, :, 0]  # (batch_size, wavelength_clips)
+        object_mask = confidence_label.bool().unsqueeze(
+            dim=-1).unsqueeze(dim=-1).expand_as(predict)  # (batch_size, wavelength_clips, workers,2)
+        # (batch_size, wavelength_clips, workers,2)
+        object_mask = torch.logical_and(object_mask, position_prefer_mask)
         nonobject_mask = torch.logical_not(object_mask)
+        # (batch_size, wavelength_clips, workers, 2)
+        raman = raman.unsqueeze(dim=2).expand_as(predict)
+
         object_target = torch.masked_select(raman, object_mask).reshape(
             (-1, 2))  # (object_dim ,2)
         object_predict = torch.masked_select(
@@ -198,22 +216,26 @@ class Experiment(pl.LightningModule):
         object_position_loss = F.mse_loss(
             object_predict[:, 1], object_target[:, 1], reduction="sum")
 
-        # (batch_size, object_dim)
         position_accuracy = 1 - \
             F.l1_loss(object_predict[:, 1],
-                      object_target[:, 1], reduction="none")
+                      object_target[:, 1], reduction="none")  # (object_dim,)
         object_confidence_target = object_target[:, 0]*position_accuracy
         object_confidence_loss = F.mse_loss(
             object_confidence_target, object_predict[:, 0], reduction="sum")
 
         loss = 0.2*nonobject_confidence_loss + \
             object_confidence_loss+5*object_position_loss
+        batch_size = raman.shape[0]
         loss = loss/batch_size
         return loss
 
     def loss_scores(self, ramans, predicted_spectrum):
-        raman_confidence = ramans[:, :, 0]
-        predicted_confidence = predicted_spectrum[:, :, 0]
+        # raman (batch_size, wavelength_clips, 2) # predict (batch_size, wavelength_clips, workers, 2)
+        raman_confidence = ramans[:, :, 0]  # (batch_size, wavelength_clips)
+        # (batch_size, wavelength_clips, workers)
+        predicted_confidence = predicted_spectrum[:, :, :, 0]
+        predicted_confidence, _ = torch.max(
+            predicted_confidence, dim=2)  # (batch_size, wavelength_clips)
         loss_trivial = F.l1_loss(predicted_confidence,
                                  raman_confidence, reduction="none")
 
