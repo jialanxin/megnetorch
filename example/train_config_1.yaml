@@ -1,5 +1,5 @@
 prefix:
-  "gdrive/MyDrive/Raman_machine_learning/models/v0.4.6/13.pretrain_fmten_dim_256/"
+  "gdrive/MyDrive/Raman_machine_learning/models/v0.4.6/13.debug_pretrain_fmten_dim_256/"
 trainer: "fit"
 optimizer:
         lr: 1e-3
