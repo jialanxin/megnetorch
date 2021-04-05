@@ -1,8 +1,8 @@
 prefix:
-  "gdrive/MyDrive/Raman_machine_learning/models/v0.4.6/13.debug_pretrain_fmten_dim_256/"
+  "/home/jlx/v0.4.6/14.pretrain_spgp_dim_256/"
 trainer: "fit"
 optimizer:
-        lr: 1e-3
+        lr: 1e-4
         type: "AdamW"
         # weight_decay: 1e-2
 # checkpoint: "gdrive/MyDrive/Raman_machine_learning/models/v0.4.3/19.finetune_lr_te-4/default/version_0/checkpoints/epoch=1909-step=217739.ckpt"
