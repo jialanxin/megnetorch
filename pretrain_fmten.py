@@ -9,7 +9,6 @@ import torch
 import torch.nn.functional as F
 from dataset import StructureFmtEnDataset
 from torch.nn import Embedding, RReLU, ReLU, Dropout
-from pretrain_spgp import Experiment as SPGP
 
 
 def ff(input_dim):

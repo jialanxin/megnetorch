@@ -10,6 +10,7 @@ import torch
 import torch.nn.functional as F
 from torch.nn import Embedding, RReLU, ReLU, Dropout
 from torchmetrics.functional import accuracy
+from pretrain_fmten import Experiment as Fmten
 
 
 def ff(input_dim):
@@ -25,18 +26,15 @@ class Experiment(pl.LightningModule):
         super().__init__()
         self.save_hyperparameters()
         self.lr = lr
-        self.position_embedding = ff(240)
-        self.lattice_embedding = ff(800)
-        encode_layer = torch.nn.TransformerEncoderLayer(
-            d_model=256, nhead=8, dim_feedforward=1024)
-        self.encoder = torch.nn.TransformerEncoder(
-            encode_layer, num_layers=num_enc)
+        fmten_model = Fmten.load_from_checkpoint("pretrain/fmten/epoch=837-step=422351.ckpt")
+        self.atom_embedding = fmten_model.atom_embedding
+        self.atomic_number_embedding = fmten_model.atomic_number_embedding
+        self.mendeleev_number_embedding = fmten_model.mendeleev_number_embedding
+        self.position_embedding = fmten_model.position_embedding
+        self.lattice_embedding = fmten_model.lattice_embedding
+        self.encoder = fmten_model.encoder
         self.readout = ff_output(input_dim=256, output_dim=230)
-        self.atom_embedding = ff(459)
-        self.atomic_number_embedding = torch.nn.Embedding(
-            num_embeddings=95, embedding_dim=256, padding_idx=0)
-        self.mendeleev_number_embedding = torch.nn.Embedding(
-            num_embeddings=104, embedding_dim=256, padding_idx=0)
+
 
 
     @staticmethod
@@ -205,7 +203,7 @@ if __name__ == "__main__":
     validate_set = torch.load("./materials/mp/Valid_spgp_set.pt")
 
     train_dataloader = DataLoader(
-        dataset=train_set, batch_size=128, num_workers=2)
+        dataset=train_set, batch_size=128, num_workers=2, shuffle=True)
     validate_dataloader = DataLoader(
         dataset=validate_set, batch_size=128, num_workers=2)
 
