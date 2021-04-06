@@ -1,5 +1,5 @@
 prefix:
-  "/home/jlx/v0.4.6/15.finetune_2_workers_nonobj_0.2_L2_1e-1/"
+  "/home/jlx/v0.4.6/16.finetune_2_workers_nonobj_0.1_L2_1e-1/"
 trainer: "fit"
 optimizer:
         lr: 1e-4
