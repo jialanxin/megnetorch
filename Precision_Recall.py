@@ -20,7 +20,7 @@ class Experiment(Finetune):
         self.save_hyperparameters()
         self.lr = lr
         pretrain_model = Finetune.load_from_checkpoint(
-            "pretrain/finetuned/epoch=2403-step=120199.ckpt")
+            "pretrain/finetuned/epoch=1894-step=94749.ckpt")
         self.atom_embedding = pretrain_model.atom_embedding
         self.atomic_number_embedding = pretrain_model.atomic_number_embedding
         self.mendeleev_number_embedding = pretrain_model.mendeleev_number_embedding
@@ -79,6 +79,10 @@ if __name__ == "__main__":
 # Accuracy: 88% Precision: 49% Recall: 90% F1Score: 64
 # Validate:
 # Accuracy: 85% Precision: 44% Recall: 78% F1Score: 55
+
+# nonobj:0.05 cut_off 0.4 L2 1e-1 workers 2
+# Validate:
+# Accuracy: 81% Precision: 52% Recall: 72% F1Score: 60
 
 # nonobj:0.1 cut_off 0.42
 # Validate:
