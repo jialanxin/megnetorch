@@ -9,34 +9,35 @@ import torch
 import torch.nn.functional as F
 from dataset import StructureFmtEnDataset
 from torch.nn import Embedding, RReLU, ReLU, Dropout
-from pretrain_spgp import Experiment as SPGP
 
 
 def ff(input_dim):
-    return torch.nn.Sequential(torch.nn.Linear(input_dim, 128))
+    return torch.nn.Sequential(torch.nn.Linear(input_dim, 256))
 
 
 def ff_output(input_dim, output_dim):
-    return torch.nn.Sequential(torch.nn.Linear(input_dim, 128), torch.nn.RReLU(), Dropout(0.1), torch.nn.Linear(128, 64), torch.nn.RReLU(), Dropout(0.1), torch.nn.Linear(64, output_dim))
+    return torch.nn.Sequential(torch.nn.Linear(input_dim, 128), torch.nn.GELU(), Dropout(0.1), torch.nn.Linear(128, 64), torch.nn.GELU(), Dropout(0.1), torch.nn.Linear(64, output_dim))
 
 
 class Experiment(pl.LightningModule):
-    def __init__(self, num_enc=6, optim_type="Adam", lr=1e-3, weight_decay=0.0):
+    def __init__(self, optim_type="Adam", lr=1e-3, weight_decay=0.0):
         super().__init__()
         self.save_hyperparameters()
         self.lr = lr
-        self.atom_embedding = ff(259)
+        self.atom_embedding = ff(459)
         self.atomic_number_embedding = torch.nn.Embedding(
-            num_embeddings=95, embedding_dim=128, padding_idx=0)
+            num_embeddings=95, embedding_dim=256, padding_idx=0)
         self.mendeleev_number_embedding = torch.nn.Embedding(
-            num_embeddings=104, embedding_dim=128, padding_idx=0)
+            num_embeddings=104, embedding_dim=256, padding_idx=0)
         self.space_group_number_embedding = torch.nn.Embedding(
-            num_embeddings=230, embedding_dim=128)
-        spgp_model = SPGP.load_from_checkpoint("pretrain/spacegroup/epoch=450-step=227303.ckpt")
-        self.position_embedding = spgp_model.position_embedding
-        self.lattice_embedding = spgp_model.lattice_embedding
-        self.encoder = spgp_model.encoder
-        self.readout = ff_output(input_dim=128, output_dim=1)
+            num_embeddings=230, embedding_dim=256)
+        self.position_embedding = ff(240)
+        self.lattice_embedding = ff(800)
+        encode_layer = torch.nn.TransformerEncoderLayer(
+            d_model=256, nhead=8, dim_feedforward=1024)
+        self.encoder = torch.nn.TransformerEncoder(
+            encode_layer, num_layers=6)
+        self.readout = ff_output(input_dim=256, output_dim=1)
 
     @staticmethod
     def Gassian_expand(value_list, min_value, max_value, intervals, expand_width, device):
@@ -67,20 +68,26 @@ class Experiment(pl.LightningModule):
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-
-        elecneg = self.Gassian_expand(elecneg, 0.5, 4.0, 40, 0.09, device)  # (batch_size, max_atoms, 40)
-        covrad = self.Gassian_expand(covrad, 50, 250, 40, 5, device)        # (batch_size, max_atoms, 40)
-        FIE = self.Gassian_expand(FIE, 3, 25, 40, 0.6, device)              # (batch_size, max_atoms, 40)
-        elecaffi = self.Gassian_expand(elecaffi, -3, 3.7, 40, 0.17, device) # (batch_size, max_atoms, 40)
-        atmwht = self.Gassian_expand(atmwht, 0, 210, 40, 5.25, device)      # (batch_size, max_atoms, 40)
+        # (batch_size, max_atoms, 80)
+        elecneg = self.Gassian_expand(elecneg, 0.5, 4.0, 80, 0.04, device)
+        # (batch_size, max_atoms, 80)
+        covrad = self.Gassian_expand(covrad, 50, 250, 80, 2.5, device)
+        # (batch_size, max_atoms, 80)
+        FIE = self.Gassian_expand(FIE, 3, 25, 80, 0.28, device)
+        # (batch_size, max_atoms, 80)
+        elecaffi = self.Gassian_expand(elecaffi, -3, 3.7, 80, 0.08, device)
+        # (batch_size, max_atoms, 80)
+        atmwht = self.Gassian_expand(atmwht, 0, 210, 80, 2.63, device)
         atoms = torch.cat(
-            (atoms, elecneg, covrad, FIE, elecaffi, atmwht), dim=2)         # (batch_size, max_atoms, 259)
+            (atoms, elecneg, covrad, FIE, elecaffi, atmwht), dim=2)         # (batch_size, max_atoms, 459)
         atoms = self.atom_embedding(atoms)  # (batch_size,max_atoms,atoms_info)
 
-        positions = positions.unsqueeze(dim=3).expand(-1, -1, 3, 40)
-        centers = torch.linspace(-15, 18, 40).to(device)
-        positions = torch.exp(-(positions - centers)**2/0.83**2)  # (batch_size, max_atoms, 3, 40)
-        positions = torch.flatten(positions, start_dim=2)         # (batch_size, max_atoms, 120)
+        positions = positions.unsqueeze(dim=3).expand(-1, -1, 3, 80)
+        centers = torch.linspace(-15, 18, 80).to(device)
+        # (batch_size, max_atoms, 3, 80)
+        positions = torch.exp(-(positions - centers)**2/0.41**2)
+        # (batch_size, max_atoms, 240)
+        positions = torch.flatten(positions, start_dim=2)
 
         # (batch_size,max_atoms,positions_info)
         positions = self.position_embedding(positions)
@@ -97,16 +104,20 @@ class Experiment(pl.LightningModule):
 
         lattice = encoded_graph["lattice"]  # lattice: (batch_size, 9, 1)
         lattice = self.Gassian_expand(
-            lattice, -15, 18, 40, 0.83, device)  # (batch_size, 9, 40)
-        lattice = torch.flatten(lattice, start_dim=1)  # (batch_size,360)
+            lattice, -15, 18, 80, 0.41, device)  # (batch_size, 9, 80)
+        lattice = torch.flatten(lattice, start_dim=1)  # (batch_size,720)
 
-        cell_volume = torch.log(encoded_graph["CV"])   # lattice: (batch_size,1,1)
-        cell_volume = self.Gassian_expand(cell_volume,3,8,40,0.13,device) # (batch_size,1,40)
-        cell_volume = torch.flatten(cell_volume,start_dim=1) # (batch_size, 40)
+        # lattice: (batch_size,1,1)
+        cell_volume = torch.log(encoded_graph["CV"])
+        cell_volume = self.Gassian_expand(
+            cell_volume, 3, 8, 80, 0.06, device)  # (batch_size,1,80)
+        cell_volume = torch.flatten(
+            cell_volume, start_dim=1)  # (batch_size, 80)
 
-        lattice = torch.cat((lattice,cell_volume),dim=1) # (batch_size, 200)
+        lattice = torch.cat((lattice, cell_volume), dim=1)  # (batch_size, 800)
         lattice = self.lattice_embedding(lattice)  # (batch_size,lacttice_info)
-        lattice = torch.unsqueeze(lattice, dim=1)  # (batch_size,1,lacttice_info)
+        # (batch_size,1,lacttice_info)
+        lattice = torch.unsqueeze(lattice, dim=1)
 
         space_group_number = encoded_graph["SGN"]  # (batch_size,1)
         sgn = self.space_group_number_embedding(
@@ -211,7 +222,7 @@ if __name__ == "__main__":
     validate_set = torch.load("./materials/mp/Valid_fmten_set.pt")
 
     train_dataloader = DataLoader(
-        dataset=train_set, batch_size=128, num_workers=2)
+        dataset=train_set, batch_size=128, num_workers=2, shuffle=True)
     validate_dataloader = DataLoader(
         dataset=validate_set, batch_size=128, num_workers=2)
 

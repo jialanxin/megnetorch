@@ -50,6 +50,7 @@ class RamanFormularDataset(StructureRamanDataset):
             structure = IStructure.from_dict(item)
             try:
                 raman = torch.FloatTensor(item["raman"])
+                mp_id = item["mp_id"]
                 formula = structure.formula
                 graph = CrystalEmbedding(structure, max_atoms=30)
             except ValueError:
@@ -59,7 +60,7 @@ class RamanFormularDataset(StructureRamanDataset):
             except TypeError:
                 continue
             encoded_graph = graph.convert_to_model_input()
-            couples.append((encoded_graph, raman, formula))
+            couples.append((encoded_graph,raman,formula,mp_id))
         return couples
 
 
@@ -71,9 +72,10 @@ def save_loss_formula(Train_or_Valid="Valid"):
     loss_list = []
     raman_list = []
     predict_list = []
+    mp_id_list = []
     for i, data in enumerate(dataloader):
-        graph, ramans, formula = data
-        input = (graph, ramans)
+        graph, ramans, formula, mp_id = data
+        input = (graph,ramans)
         predicted_spectrum = model(input)
         loss = Experiment.yolov1_loss(ramans,predicted_spectrum)
         formula_list.append(formula[0])
