@@ -1,5 +1,5 @@
 prefix:
-  "/home/jlx/v0.4.6/18.finetune_2_workers_max_nonobj_0.2_L2_1e-1/"
+  "/home/jlx/v0.4.6/19.finetune_reinit_encoder_layer_5/"
 trainer: "fit"
 optimizer:
         lr: 1e-4
