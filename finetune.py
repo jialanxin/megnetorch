@@ -39,13 +39,13 @@ class Experiment(pl.LightningModule):
         self.position_embedding = spgp_model.position_embedding
         self.lattice_embedding = spgp_model.lattice_embedding
         self.encoder = spgp_model.encoder
-        for internal_layer in self.encoder.layers[5].children():
-            if hasattr(internal_layer,"reset_parameters"):
-                print(f"Reset parameters of {internal_layer}")
-                internal_layer.reset_parameters()
-            elif hasattr(internal_layer,"_reset_parameters"):
-                print(f"Reset parameters of {internal_layer}")
-                internal_layer._reset_parameters()
+        # for internal_layer in self.encoder.layers[5].children():
+        #     if hasattr(internal_layer,"reset_parameters"):
+        #         print(f"Reset parameters of {internal_layer}")
+        #         internal_layer.reset_parameters()
+        #     elif hasattr(internal_layer,"_reset_parameters"):
+        #         print(f"Reset parameters of {internal_layer}")
+        #         internal_layer._reset_parameters()
         self.readout = ff_output(input_dim=256, output_dim=100)
 
     @staticmethod
