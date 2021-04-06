@@ -20,7 +20,7 @@ class Experiment(Finetune):
         self.save_hyperparameters()
         self.lr = lr
         pretrain_model = Finetune.load_from_checkpoint(
-            "pretrain/finetuned/epoch=2005-step=114341.ckpt")
+            "pretrain/finetuned/epoch=2403-step=120199.ckpt")
         self.atom_embedding = pretrain_model.atom_embedding
         self.atomic_number_embedding = pretrain_model.atomic_number_embedding
         self.mendeleev_number_embedding = pretrain_model.mendeleev_number_embedding
@@ -48,7 +48,9 @@ if __name__ == "__main__":
     for i,data in enumerate(validate_dataloader):
         _,raman = data
         predicted_spectrum =  model(data)
-        predict_confidence = predicted_spectrum[:,:,0].clone()
+        predicted_confidence = predicted_spectrum[:,:,:,0]
+        predicted_confidence_backup,_ = torch.max(predicted_confidence, dim=2)
+        predict_confidence = predicted_confidence_backup.clone()
         target_confidence = raman[:,:,0]
     cut_off_list = np.linspace(0.2,0.8,60)
     Ac_list = np.array([])
@@ -60,7 +62,7 @@ if __name__ == "__main__":
         predict_confidence[less] = 0
         predict_confidence[torch.logical_not(less)] = 1
         Accuracy, Precision,Recall,F1Score = Experiment.scores(predict_confidence,target_confidence)
-        predict_confidence = predicted_spectrum[:,:,0].clone()
+        predict_confidence = predicted_confidence_backup.clone()
         Ac_list = np.append(Ac_list,Accuracy.item())
         Pr_list = np.append(Pr_list,Precision.item())
         Rc_list = np.append(Rc_list,Recall.item())
@@ -81,6 +83,9 @@ if __name__ == "__main__":
 # nonobj:0.1 cut_off 0.42
 # Validate:
 # Accuracy: 79% Precision: 53% Recall: 75% F1Score: 62
+# nonobj:0.1 cut_off 0.36 L2 1e-1 workers 2
+# Validate:
+# Accuracy: 82% Precision: 54% Recall: 72% F1Score: 62
 
 # nonobj:0.2 cut_off 0.4
 # Validate:
@@ -88,6 +93,9 @@ if __name__ == "__main__":
 # nonobj:0.2 cut_off 0.41 L2 1e-2
 # Validate:
 # Accuracy: 83% Precision: 55% Recall: 72% F1Score: 62
+# nonobj:0.2 cut_off 0.37 L2 1e-1 workers 2
+# Validate:
+# Accuracy: 84% Precision: 57% Recall: 69% F1Score: 63
 
 # nonobj:0.3 cut_off 0.37
 # Validate:
