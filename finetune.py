@@ -39,15 +39,18 @@ class Experiment(pl.LightningModule):
         self.position_embedding = spgp_model.position_embedding
         self.lattice_embedding = spgp_model.lattice_embedding
         self.encoder = spgp_model.encoder
-        # for internal_layer in self.encoder.layers[5].children():
-        #     if hasattr(internal_layer,"reset_parameters"):
-        #         print(f"Reset parameters of {internal_layer}")
-        #         internal_layer.reset_parameters()
-        #     elif hasattr(internal_layer,"_reset_parameters"):
-        #         print(f"Reset parameters of {internal_layer}")
-        #         internal_layer._reset_parameters()
+        self.re_init_parameters(self.encoder.layers[5])
+        self.re_init_parameters(self.encoder.layers[4])
         self.readout = ff_output(input_dim=256, output_dim=100)
-
+    @staticmethod
+    def re_init_parameters(layer):
+        for internal_layer in layer.children():
+            if hasattr(internal_layer,"reset_parameters"):
+                print(f"Reset parameters of {internal_layer}")
+                internal_layer.reset_parameters()
+            elif hasattr(internal_layer,"_reset_parameters"):
+                print(f"Reset parameters of {internal_layer}")
+                internal_layer._reset_parameters()
     @staticmethod
     def Gassian_expand(value_list, min_value, max_value, intervals, expand_width, device):
         value_list = value_list.expand(-1, -1, intervals)
