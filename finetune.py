@@ -187,16 +187,9 @@ class Experiment(pl.LightningModule):
         # (batch_size, wavelength_clips, workers)
         position_accuracy = 1 - \
             F.l1_loss(predict_position, position_label, reduction="none")
-        # (batch_size, wavelength_clips, workers)
-        position_prefer_mask = torch.argmax(
-            position_accuracy, dim=2, keepdim=True)
-        position_prefer_mask = position_prefer_mask.unsqueeze(
-            dim=-1).expand_as(predict)  # (batch_size, wavelength_clips, workers, 2)
         confidence_label = raman[:, :, 0]  # (batch_size, wavelength_clips)
         object_mask = confidence_label.bool().unsqueeze(
             dim=-1).unsqueeze(dim=-1).expand_as(predict)  # (batch_size, wavelength_clips, workers,2)
-        # (batch_size, wavelength_clips, workers,2)
-        object_mask = torch.logical_and(object_mask, position_prefer_mask)
         nonobject_mask = torch.logical_not(object_mask)
         # (batch_size, wavelength_clips, workers, 2)
         raman = raman.unsqueeze(dim=2).expand_as(predict)
