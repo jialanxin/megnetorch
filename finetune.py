@@ -40,7 +40,6 @@ class Experiment(pl.LightningModule):
         self.lattice_embedding = spgp_model.lattice_embedding
         self.encoder = spgp_model.encoder
         self.re_init_parameters(self.encoder.layers[5])
-        self.re_init_parameters(self.encoder.layers[4])
         self.readout = ff_output(input_dim=256, output_dim=100)
     @staticmethod
     def re_init_parameters(layer):
