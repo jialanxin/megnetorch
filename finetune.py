@@ -223,7 +223,7 @@ class Experiment(pl.LightningModule):
         object_confidence_loss = F.mse_loss(
             object_confidence_target, object_predict[:, 0], reduction="sum")
 
-        loss = 0.1*nonobject_confidence_loss + \
+        loss = 0.05*nonobject_confidence_loss + \
             object_confidence_loss+5*object_position_loss
         batch_size = raman.shape[0]
         loss = loss/batch_size
@@ -371,8 +371,8 @@ if __name__ == "__main__":
         try:
             path = config["checkpoint"]
             trainer = pl.Trainer(resume_from_checkpoint=path, gpus=1 if torch.cuda.is_available(
-            ) else 0, logger=logger, callbacks=[checkpoint_callback], max_epochs=4000)
+            ) else 0, logger=logger, callbacks=[checkpoint_callback], max_epochs=2000)
         except KeyError:
             trainer = pl.Trainer(gpus=1 if torch.cuda.is_available() else 0, logger=logger,
-                                 callbacks=[checkpoint_callback],  max_epochs=4000)
+                                 callbacks=[checkpoint_callback],  max_epochs=2000)
         trainer.fit(experiment, train_dataloader, validate_dataloader)
