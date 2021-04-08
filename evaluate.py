@@ -1,18 +1,14 @@
 import json
-import argparse
-import torch
-import torch.nn.functional as F
-import yaml
-import pytorch_lightning as pl
-from pytorch_lightning.loggers import TensorBoardLogger
-from pytorch_lightning.callbacks import ModelCheckpoint
-from torch.utils.data import DataLoader
-from torch.nn import Embedding, RReLU, ReLU, Dropout
-from dataset import StructureRamanDataset, IStructure, CrystalEmbedding
-from finetune import Experiment as Finetune
-import plotly.graph_objects as go
+
 import numpy as np
+import plotly.graph_objects as go
 import streamlit as st
+import torch
+from plotly.subplots import make_subplots
+from torch.utils.data import DataLoader
+
+from dataset import CrystalEmbedding, IStructure, StructureRamanDataset
+from finetune import Experiment as Finetune
 
 
 class Experiment(Finetune):
@@ -21,7 +17,7 @@ class Experiment(Finetune):
         self.save_hyperparameters()
         self.lr = lr
         pretrain_model = Finetune.load_from_checkpoint(
-            "pretrain/finetuned/epoch=3535-step=201551.ckpt")
+            "pretrain/finetuned/epoch=1999-step=99999.ckpt")
         self.atom_embedding = pretrain_model.atom_embedding
         self.atomic_number_embedding = pretrain_model.atomic_number_embedding
         self.mendeleev_number_embedding = pretrain_model.mendeleev_number_embedding
@@ -36,7 +32,7 @@ class Experiment(Finetune):
 
 
 def load_dataset(Train_or_Valid="Valid"):
-    with open(f"materials/JVASP/{Train_or_Valid}_set_25_uneq_yolov1.json", "r") as f:
+    with open(f"materials/JVASP/{Train_or_Valid}_unique_mp_id.json", "r") as f:
         data = json.loads(f.read())
     dataset = RamanFormularDataset(data)
     return dataset
@@ -50,6 +46,7 @@ class RamanFormularDataset(StructureRamanDataset):
             structure = IStructure.from_dict(item)
             try:
                 raman = torch.FloatTensor(item["raman"])
+                mp_id = item["mp_id"]
                 formula = structure.formula
                 graph = CrystalEmbedding(structure, max_atoms=30)
             except ValueError:
@@ -59,8 +56,51 @@ class RamanFormularDataset(StructureRamanDataset):
             except TypeError:
                 continue
             encoded_graph = graph.convert_to_model_input()
-            couples.append((encoded_graph, raman, formula))
+            couples.append((encoded_graph, raman, formula, mp_id))
         return couples
+
+
+def NMS_or_not(predicted, nms=False, cut_off=0.5):
+    predicted = predicted[0]
+    predicted_confidence = predicted[:, :, 0]  # (25,2)
+    predicted_position = predicted[:, :, 1]   # (25,2)
+    predicted_position = absolute_position(predicted_position)  # (25,2)
+    predicted_confidence, selected_worker = torch.max(
+        predicted_confidence, dim=-1)  # (25,)
+    # predict_position[i,j=0] = predicted_postion[i, selected_worker[i,j=0]]
+    selected_worker = selected_worker.view((-1, 1))
+    predicted_position = torch.gather(
+        predicted_position, 1, selected_worker).flatten()
+    less = torch.less_equal(predicted_confidence, cut_off)
+    more = torch.logical_not(less)
+    predicted_confidence_round = predicted_confidence.clone()
+    predicted_confidence_round[less] = 0
+    predicted_confidence_round[more] = 1
+    return predicted_confidence, predicted_position, predicted_confidence_round
+
+
+def count_incorrects(ramans, predict_confidence_round):
+    ramans = ramans[0]
+    target_confidence = ramans[:, 0]
+    target_position = ramans[:, 1]
+    target_position = absolute_position(target_position).flatten()
+    incorrects = torch.not_equal(
+        target_confidence, predict_confidence_round).float().sum()
+    return incorrects, target_confidence, target_position
+
+
+def absolute_position(relative_postition):
+    edge = torch.FloatTensor([100, 110,  120, 131,  143,  155,  167,  180,  194,  209,  226,  241,
+                              259,  277,  297,  322,  347,  375,  406,  440,  478,  528,  587,  685,  844, 1100])
+    left = edge[:-1]
+    right = edge[1:]
+    edge_range = right-left
+    left = left.view((-1, 1))
+    edge_range = edge_range.view((-1, 1))
+    if relative_postition.ndim == 1:
+        relative_postition = relative_postition.view((-1,1))
+    abs_pos = left+edge_range*relative_postition
+    return abs_pos
 
 
 def save_loss_formula(Train_or_Valid="Valid"):
@@ -68,83 +108,92 @@ def save_loss_formula(Train_or_Valid="Valid"):
     dataloader = DataLoader(dataset=dataset, batch_size=1)
     model = Experiment()
     formula_list = []
-    loss_list = []
-    raman_list = []
-    predict_list = []
+    incorrect_list = []
+    target_confidence_list = []
+    target_position_list = []
+    predicted_confidence_list = []
+    predicted_position_list = []
+    mp_id_list = []
     for i, data in enumerate(dataloader):
-        graph, ramans, formula = data
+        graph, ramans, formula, mp_id = data
         input = (graph, ramans)
         predicted_spectrum = model(input)
-        loss = Experiment.yolov1_loss(ramans,predicted_spectrum)
+        predicted_confidence, predicted_position, predicted_confidence_round = NMS_or_not(
+            predicted_spectrum)
+        incorrects, target_confidence, target_position = count_incorrects(
+            ramans, predicted_confidence_round)
         formula_list.append(formula[0])
-        loss_list.append(loss.item())
-        raman_list.append(ramans.detach().numpy())
-        predict_list.append(predicted_spectrum.detach().numpy())
-    torch.save({"loss": loss_list, "formula": formula_list, "raman": raman_list,
-                "predict": predict_list}, f"materials/JVASP/{Train_or_Valid}_loss_formula_yolo.pt")
+        incorrect_list.append(incorrects)
+        target_confidence_list.append(target_confidence)
+        target_position_list.append(target_position)
+        predicted_confidence_list.append(predicted_confidence)
+        predicted_position_list.append(predicted_position)
+        mp_id_list.append(mp_id)
+    torch.save({"formula": formula_list, "incorrect": incorrect_list, "target_confidence": target_confidence_list, "target_position": target_position_list,
+                "predicted_confidence": predicted_confidence_list, "predicted_position": predicted_position_list, "mp_id": mp_id_list}, f"materials/JVASP/{Train_or_Valid}_loss_formula_yolo.pt")
 
 
 def load_loss_formula(Train_or_Valid="Valid"):
     data = torch.load(f"materials/JVASP/{Train_or_Valid}_loss_formula_yolo.pt")
-    return data["loss"], data["formula"], data["raman"], data["predict"]
+    return  data["formula"], data["incorrect"], data["target_confidence"], data["target_position"], data["predicted_confidence"],data["predicted_position"],data["mp_id"]
 
 
 def plot_points(Train_or_Valid="Valid"):
-    loss, formula, _, _ = load_loss_formula(Train_or_Valid)
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=formula, y=loss, mode="markers",
-                             marker=dict(size=5 if Train_or_Valid == "Valid" else 2)))
+    formula,incorrect, _, _,_,_,_ = load_loss_formula(Train_or_Valid)
+    fig = make_subplots(rows=2,cols=1)
+    fig.add_trace(go.Scatter(x=formula, y=incorrect, mode="markers",
+                             marker=dict(size=5 if Train_or_Valid == "Valid" else 2)),col=1,row=1)
+    count, value = np.histogram(incorrect,bins=19)
+    fig.add_trace(go.Scatter(x=value,y=count),col=1,row=2)
+    fig.update_layout(showlegend=False)
     return fig
 
-def process_y(x,raman,cut_off=0.5):
-    edge = np.array([100, 110,  120, 131,  143,  155,  167,  180,  194,  209,  226,  241,
-                  259,  277,  297,  322,  347,  375,  406,  440,  478,  528,  587,  685,  844, 1100])
-    left = edge[:-1]
-    right = edge[1:]
-    edge_range = right-left
-    confidence = raman[:,0]
-    position = raman[:,1]
-    absolute_position = position*edge_range+left
-    y = np.zeros_like(x)
-    for confidence, abs_pos in zip(confidence,absolute_position):
-        if confidence <= cut_off:
+
+def process_y(x, confidence, position,cut_off=0.5):
+    y = torch.zeros_like(x)
+    for conf, abs_pos in zip(confidence, position):
+        if conf <= cut_off:
             continue
         else:
-            y += confidence*np.exp(-(x-abs_pos)**2/2/0.5**2)
-    return y
+            y += conf*torch.exp(-(x-abs_pos)**2/2/0.5**2)
+    return y.detach().numpy()
 
 
-def search_formula(formula, Train_or_Valid="Valid",cut_off=0.5):
-    loss, formula_list, raman, predict = load_loss_formula(Train_or_Valid)
+def search_formula(formula, Train_or_Valid="Valid", cut_off=0.5):
+    formula_list, incorrect,target_confidence,target_position, predict_confidence,predict_position,mp_id = load_loss_formula(Train_or_Valid)
     index = formula_list.index(formula)
-    raman = raman[index][0]
-    predict = predict[index][0]
-    loss = loss[index]
+    target_confidence = target_confidence[index]
+    target_position = target_position[index]
+    predict_confidence = predict_confidence[index]
+    predict_position = predict_position[index]
+    incorrect = incorrect[index]
+    mp_id = mp_id[index][0]
     fig = go.Figure()
-    x = np.linspace(100,1100,10000)
-    raman = process_y(x,raman)
-    predict = process_y(x,predict,cut_off)
+    x = torch.linspace(100, 1100, 10000)
+    raman = process_y(x, target_confidence, target_position)
+    predict = process_y(x, predict_confidence,predict_position, cut_off)
     fig.add_trace(go.Scatter(x=x, y=raman, name="lable"))
     fig.add_trace(go.Scatter(x=x, y=predict, name="predict"))
-    return fig, loss
+    return fig, incorrect, mp_id
 
 
 if __name__ == "__main__":
     # save_loss_formula("Train")
     # save_loss_formula("Valid")
-    st.header("Loss of Validation Set")
+    st.header("Incorrectness of Validation Set")
     fig_valid = plot_points("Valid")
     st.write(fig_valid)
     formula_valid = st.text_input("Insert a formula", "Ta4 Si2")
     cut_off_valid = st.slider("ignore confidence under cutoff", min_value=0.0, max_value=1.0, value=0.5, key="Valid")
-    fig_valid_search, loss_valid = search_formula(formula_valid, "Valid",cut_off_valid)
+    fig_valid_search,incorrect_valid,mp_id_valid = search_formula(formula_valid, "Valid",cut_off_valid)
     st.write(fig_valid_search)
-    st.write(f"loss:{loss_valid}")
-    st.header("Loss of Train Set")
-    fig_train = plot_points("Train")
-    st.write(fig_train)
-    formula_train = st.text_input("Insert a formula", "As4")
-    cut_off_train = st.slider("ignore confidence under cutoff", min_value=0.0, max_value=1.0, value=0.5, key="Train")
-    fig_train_search, loss_train = search_formula(formula_train, "Train",cut_off_train)
-    st.write(fig_train_search)
-    st.write(f"loss:{loss_train}")
+    st.write(f"incorrectness:{incorrect_valid}")
+    st.write(f"mp_link: https://www.materialsproject.org/materials/mp-{mp_id_valid}")
+    # st.header("Loss of Train Set")
+    # fig_train = plot_points("Train")
+    # st.write(fig_train)
+    # formula_train = st.text_input("Insert a formula", "As4")
+    # cut_off_train = st.slider("ignore confidence under cutoff", min_value=0.0, max_value=1.0, value=0.5, key="Train")
+    # fig_train_search, loss_train = search_formula(formula_train, "Train",cut_off_train)
+    # st.write(fig_train_search)
+    # st.write(f"loss:{loss_train}")

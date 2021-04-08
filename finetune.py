@@ -29,9 +29,9 @@ class Experiment(pl.LightningModule):
         self.save_hyperparameters()
         self.lr = lr
         fmten_model = FmtEn.load_from_checkpoint(
-            "pretrain/fmten/epoch=970-step=489383.ckpt")
+            "pretrain/fmten/epoch=837-step=422351.ckpt")
         spgp_model = SPGP.load_from_checkpoint(
-            "pretrain/spacegroup/epoch=450-step=227303.ckpt")
+            "pretrain/spacegroup/epoch=973-step=490895.ckpt")
         self.atom_embedding = fmten_model.atom_embedding
         self.atomic_number_embedding = fmten_model.atomic_number_embedding
         self.space_group_number_embedding = fmten_model.space_group_number_embedding
@@ -39,8 +39,17 @@ class Experiment(pl.LightningModule):
         self.position_embedding = spgp_model.position_embedding
         self.lattice_embedding = spgp_model.lattice_embedding
         self.encoder = spgp_model.encoder
-        self.readout = ff_output(input_dim=128, output_dim=50)
-
+        self.re_init_parameters(self.encoder.layers[5])
+        self.readout = ff_output(input_dim=256, output_dim=100)
+    @staticmethod
+    def re_init_parameters(layer):
+        for internal_layer in layer.children():
+            if hasattr(internal_layer,"reset_parameters"):
+                print(f"Reset parameters of {internal_layer}")
+                internal_layer.reset_parameters()
+            elif hasattr(internal_layer,"_reset_parameters"):
+                print(f"Reset parameters of {internal_layer}")
+                internal_layer._reset_parameters()
     @staticmethod
     def Gassian_expand(value_list, min_value, max_value, intervals, expand_width, device):
         value_list = value_list.expand(-1, -1, intervals)
@@ -69,25 +78,25 @@ class Experiment(pl.LightningModule):
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        # (batch_size, max_atoms, 40)
-        elecneg = self.Gassian_expand(elecneg, 0.5, 4.0, 40, 0.09, device)
-        # (batch_size, max_atoms, 40)
-        covrad = self.Gassian_expand(covrad, 50, 250, 40, 5, device)
-        # (batch_size, max_atoms, 40)
-        FIE = self.Gassian_expand(FIE, 3, 25, 40, 0.6, device)
-        # (batch_size, max_atoms, 40)
-        elecaffi = self.Gassian_expand(elecaffi, -3, 3.7, 40, 0.17, device)
-        # (batch_size, max_atoms, 40)
-        atmwht = self.Gassian_expand(atmwht, 0, 210, 40, 5.25, device)
+       # (batch_size, max_atoms, 80)
+        elecneg = self.Gassian_expand(elecneg, 0.5, 4.0, 80, 0.04, device)
+        # (batch_size, max_atoms, 80)
+        covrad = self.Gassian_expand(covrad, 50, 250, 80, 2.5, device)
+        # (batch_size, max_atoms, 80)
+        FIE = self.Gassian_expand(FIE, 3, 25, 80, 0.28, device)
+        # (batch_size, max_atoms, 80)
+        elecaffi = self.Gassian_expand(elecaffi, -3, 3.7, 80, 0.08, device)
+        # (batch_size, max_atoms, 80)
+        atmwht = self.Gassian_expand(atmwht, 0, 210, 80, 2.63, device)
         atoms = torch.cat(
-            (atoms, elecneg, covrad, FIE, elecaffi, atmwht), dim=2)         # (batch_size, max_atoms, 259)
+            (atoms, elecneg, covrad, FIE, elecaffi, atmwht), dim=2)         # (batch_size, max_atoms, 459)
         atoms = self.atom_embedding(atoms)  # (batch_size,max_atoms,atoms_info)
 
-        positions = positions.unsqueeze(dim=3).expand(-1, -1, 3, 40)
-        centers = torch.linspace(-15, 18, 40).to(device)
-        # (batch_size, max_atoms, 3, 40)
-        positions = torch.exp(-(positions - centers)**2/0.83**2)
-        # (batch_size, max_atoms, 120)
+        positions = positions.unsqueeze(dim=3).expand(-1, -1, 3, 80)
+        centers = torch.linspace(-15, 18, 80).to(device)
+        # (batch_size, max_atoms, 3, 80)
+        positions = torch.exp(-(positions - centers)**2/0.41**2)
+        # (batch_size, max_atoms, 240)
         positions = torch.flatten(positions, start_dim=2)
 
         # (batch_size,max_atoms,positions_info)
@@ -104,15 +113,15 @@ class Experiment(pl.LightningModule):
 
         lattice = encoded_graph["lattice"]  # lattice: (batch_size, 9, 1)
         lattice = self.Gassian_expand(
-            lattice, -15, 18, 40, 0.83, device)  # (batch_size, 9, 40)
-        lattice = torch.flatten(lattice, start_dim=1)  # (batch_size,360)
+            lattice, -15, 18, 80, 0.41, device)  # (batch_size, 9, 80)
+        lattice = torch.flatten(lattice, start_dim=1)  # (batch_size,720)
 
         # lattice: (batch_size,1,1)
         cell_volume = torch.log(encoded_graph["CV"])
         cell_volume = self.Gassian_expand(
-            cell_volume, 3, 8, 40, 0.13, device)  # (batch_size,1,40)
+            cell_volume, 3, 8, 80, 0.06, device)  # (batch_size,1,80)
         cell_volume = torch.flatten(
-            cell_volume, start_dim=1)  # (batch_size, 40)
+            cell_volume, start_dim=1)  # (batch_size, 80)
 
         lattice = torch.cat((lattice, cell_volume), dim=1)  # (batch_size, 200)
         lattice = self.lattice_embedding(lattice)  # (batch_size,lacttice_info)
@@ -141,7 +150,7 @@ class Experiment(pl.LightningModule):
         system_out = atoms[0]  # (batch_size,atoms_info)
 
         # (batch_size, wavelength_clips, confidence+position)
-        output_spectrum = self.readout(system_out).reshape(-1, 25, 2)
+        output_spectrum = self.readout(system_out).reshape(-1, 25, 2, 2)
 
         return output_spectrum
 
@@ -177,12 +186,23 @@ class Experiment(pl.LightningModule):
 
     @staticmethod
     def yolov1_loss(raman, predict):
-        confidence_lable = raman[:, :, 0]  # (batch_size, wavelength_clips)
-        batch_size = raman.shape[0]
-        wavelength_clips = raman.shape[1]
-        object_mask = confidence_lable.bool().unsqueeze(
-            dim=2).expand_as(raman)  # (batch_size, wavelength_clips,2)
+        # raman (batch_size, wavelength_clips, 2) # predict (batch_size, wavelength_clips, workers, 2)
+        position_label = raman[:, :, 1]  # (batch_size, wavelength_clips)
+        # (batch_size, wavelength_clips,workers)
+        predict_position = predict[:, :, :, 1]
+        # (batch_size, wavelength_clips,workers)
+        position_label = position_label.unsqueeze(
+            dim=-1).expand_as(predict_position)
+        # (batch_size, wavelength_clips, workers)
+        position_accuracy = 1 - \
+            F.l1_loss(predict_position, position_label, reduction="none")
+        confidence_label = raman[:, :, 0]  # (batch_size, wavelength_clips)
+        object_mask = confidence_label.bool().unsqueeze(
+            dim=-1).unsqueeze(dim=-1).expand_as(predict)  # (batch_size, wavelength_clips, workers,2)
         nonobject_mask = torch.logical_not(object_mask)
+        # (batch_size, wavelength_clips, workers, 2)
+        raman = raman.unsqueeze(dim=2).expand_as(predict)
+
         object_target = torch.masked_select(raman, object_mask).reshape(
             (-1, 2))  # (object_dim ,2)
         object_predict = torch.masked_select(
@@ -198,22 +218,26 @@ class Experiment(pl.LightningModule):
         object_position_loss = F.mse_loss(
             object_predict[:, 1], object_target[:, 1], reduction="sum")
 
-        # (batch_size, object_dim)
         position_accuracy = 1 - \
             F.l1_loss(object_predict[:, 1],
-                      object_target[:, 1], reduction="none")
+                      object_target[:, 1], reduction="none")  # (object_dim,)
         object_confidence_target = object_target[:, 0]*position_accuracy
         object_confidence_loss = F.mse_loss(
             object_confidence_target, object_predict[:, 0], reduction="sum")
 
         loss = 0.2*nonobject_confidence_loss + \
             object_confidence_loss+5*object_position_loss
+        batch_size = raman.shape[0]
         loss = loss/batch_size
         return loss
 
     def loss_scores(self, ramans, predicted_spectrum):
-        raman_confidence = ramans[:, :, 0]
-        predicted_confidence = predicted_spectrum[:, :, 0]
+        # raman (batch_size, wavelength_clips, 2) # predict (batch_size, wavelength_clips, workers, 2)
+        raman_confidence = ramans[:, :, 0]  # (batch_size, wavelength_clips)
+        # (batch_size, wavelength_clips, workers)
+        predicted_confidence = predicted_spectrum[:, :, :, 0]
+        predicted_confidence, _ = torch.max(
+            predicted_confidence, dim=2)  # (batch_size, wavelength_clips)
         loss_trivial = F.l1_loss(predicted_confidence,
                                  raman_confidence, reduction="none")
 
@@ -349,8 +373,8 @@ if __name__ == "__main__":
         try:
             path = config["checkpoint"]
             trainer = pl.Trainer(resume_from_checkpoint=path, gpus=1 if torch.cuda.is_available(
-            ) else 0, logger=logger, callbacks=[checkpoint_callback], max_epochs=4000)
+            ) else 0, logger=logger, callbacks=[checkpoint_callback], max_epochs=2000)
         except KeyError:
             trainer = pl.Trainer(gpus=1 if torch.cuda.is_available() else 0, logger=logger,
-                                 callbacks=[checkpoint_callback],  max_epochs=4000)
+                                 callbacks=[checkpoint_callback],  max_epochs=2000)
         trainer.fit(experiment, train_dataloader, validate_dataloader)
