@@ -18,17 +18,31 @@ def range_encode(value, min, max, steps):
     return encoded
 
 
-class EncodedGraph:
-    def __init__(self, atoms, bonds, bond_atom_1, bond_atom_2, num_atoms, num_bonds):
-        self.atoms = atoms
-        self.bonds = bonds
-        self.bond_atom_1 = bond_atom_1
-        self.bond_atom_2 = bond_atom_2
-        self.num_atoms = num_atoms
-        self.num_bonds = num_bonds
+class CrystalBase:
+    def __init__(self, structure: Structure):
+        self.structure = structure
+        self.atoms = structure.species
+        self.num_atoms = len(self.atoms)
+        self.atomic_numbers = [atom.Z for atom in self.atoms]
+
+    @property
+    def get_atomic_groups(self):
+        num_atoms = self.num_atoms
+        encoded_atomic_groups = torch.zeros((num_atoms, 18), dtype=torch.float)
+        for i, atom in enumerate(self.atoms):
+            encoded_atomic_groups[i, atom.group-1] = 1
+        return encoded_atomic_groups
+
+    @property
+    def get_atomic_periods(self):
+        num_atoms = self.num_atoms
+        encoded_atomic_periods = torch.zeros((num_atoms, 9), dtype=torch.float)
+        for i, atom in enumerate(self.atoms):
+            encoded_atomic_periods[i, atom.row-1] = 1
+        return encoded_atomic_periods
 
 
-class CrystalGraph:
+class CrystalGraph(CrystalBase):
     @staticmethod
     def get_neighbors_within_cutoff(structure: Structure, cutoff: float = 5.0, tolerence: float = 1e-8) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         period_boundary_condition = np.array([1, 1, 1])
@@ -51,22 +65,6 @@ class CrystalGraph:
         if np.size(np.unique(self.bond_atom_1)) < len(self.atomic_numbers):
             raise RuntimeError("Isolated atoms found in the structure")
         self.state = np.array([0.0, 0.0], dtype=np.float)
-
-    @property
-    def get_atomic_periods(self):
-        num_atoms = self.num_atoms
-        encoded_atomic_periods = torch.zeros((num_atoms, 9), dtype=torch.float)
-        for i, atom in enumerate(self.atoms):
-            encoded_atomic_periods[i, atom.row-1] = 1
-        return encoded_atomic_periods
-
-    @property
-    def get_atomic_groups(self):
-        num_atoms = self.num_atoms
-        encoded_atomic_groups = torch.zeros((num_atoms, 18), dtype=torch.float)
-        for i, atom in enumerate(self.atoms):
-            encoded_atomic_groups[i, atom.group-1] = 1
-        return encoded_atomic_groups
 
     @property
     def get_atomic_blocks(self):
@@ -186,12 +184,12 @@ class CrystalGraph:
         bond_atom_2 = torch.LongTensor(self.bond_atom_2)
         num_atoms = self.num_atoms
         num_bonds = bonds.shape[0]
-        input = EncodedGraph(atoms, bonds, bond_atom_1,
-                             bond_atom_2, num_atoms, num_bonds)
+        input = (atoms, bonds, bond_atom_1,
+                 bond_atom_2, num_atoms, num_bonds)
         return input
 
 
-class CrystalEmbedding(CrystalGraph):
+class CrystalEmbedding(CrystalBase):
     def __init__(self, structure, max_atoms=150):
         super().__init__(structure)
         self.max_atoms = max_atoms
@@ -267,6 +265,7 @@ class CrystalEmbedding(CrystalGraph):
     def get_mendeleev_no(self):
         mendeleev_no = [atom.mendeleev_no for atom in self.atoms]
         return mendeleev_no
+
     @property
     def get_valence_electrons(self):
         patterm = re.compile(r"\d+[spdf]\d+")
@@ -279,31 +278,33 @@ class CrystalEmbedding(CrystalGraph):
             for orbit in valence_structure:
                 if "s" in orbit:
                     s = int(orbit[2:])
-                    encoded_valence_electron_number[i,s-1] += 1
+                    encoded_valence_electron_number[i, s-1] += 1
                 if "p" in orbit:
                     p = int(orbit[2:])
-                    encoded_valence_electron_number[i,2+p-1] += 1
+                    encoded_valence_electron_number[i, 2+p-1] += 1
                 if "d" in orbit:
                     d = int(orbit[2:])
-                    encoded_valence_electron_number[i,8+d-1] += 1
+                    encoded_valence_electron_number[i, 8+d-1] += 1
                 if "f" in orbit:
                     f = int(orbit[2:])
-                    encoded_valence_electron_number[i,18+f-1] += 1
+                    encoded_valence_electron_number[i, 18+f-1] += 1
         return encoded_valence_electron_number
 
-    def process_index_feature_input(self,value_list):
+    def process_index_feature_input(self, value_list):
         atomic_number_like = torch.LongTensor(value_list)  # (num_atoms,)
         # (max_atoms-num_atoms,)
         padding = torch.zeros(
             (self.max_atoms-self.num_atoms,), dtype=torch.long)
         padded = torch.cat((atomic_number_like, padding))  # (max_atoms,)
         return padded
+
     def get_space_group_number(self):
         space_group_number = self.structure.get_space_group_info()[1]
-        space_group_number = torch.LongTensor([space_group_number]) #(1,)
+        space_group_number = torch.LongTensor([space_group_number])  # (1,)
         return space_group_number
+
     def get_cell_volume(self):
-        cell_volume = torch.FloatTensor([[self.structure.volume]]) #(1,1)
+        cell_volume = torch.FloatTensor([[self.structure.volume]])  # (1,1)
         return cell_volume
 
     def convert_to_model_input(self) -> Dict:
@@ -350,8 +351,8 @@ class CrystalEmbedding(CrystalGraph):
         lattice = torch.FloatTensor(
             self.structure.lattice.matrix).reshape(-1, 1)  # (9, 1)
 
-        space_group_number = self.get_space_group_number() 
+        space_group_number = self.get_space_group_number()
 
-        cell_volume = self.get_cell_volume() # (1,1)
+        cell_volume = self.get_cell_volume()  # (1,1)
 
-        return {"atoms": atoms_padded, "elecneg": elecneg_padded, "covrad": covrad_padded, "FIE": FIE_padded, "elecaffi": elecaffi_padded, "AM": atomic_weight_padded, "AN": atomic_number_padded, "MN": mendeleev_no_padded, "positions": positions_padded, "padding_mask": self.padding, "lattice": lattice,"SGN":space_group_number,"CV":cell_volume}
+        return {"atoms": atoms_padded, "elecneg": elecneg_padded, "covrad": covrad_padded, "FIE": FIE_padded, "elecaffi": elecaffi_padded, "AM": atomic_weight_padded, "AN": atomic_number_padded, "MN": mendeleev_no_padded, "positions": positions_padded, "padding_mask": self.padding, "lattice": lattice, "SGN": space_group_number, "CV": cell_volume}

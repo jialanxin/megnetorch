@@ -1,4 +1,3 @@
-import json
 import argparse
 import yaml
 import pytorch_lightning as pl
@@ -7,7 +6,8 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from torch.utils.data import DataLoader
 import torch
 import torch.nn.functional as F
-from dataset import StructureFmtEnDataset
+from dataset import StructureFmtEnStreamDataset
+from pathlib import Path
 from torch.nn import Embedding, RReLU, ReLU, Dropout
 
 
@@ -16,7 +16,7 @@ def ff(input_dim):
 
 
 def ff_output(input_dim, output_dim):
-    return torch.nn.Sequential(torch.nn.Linear(input_dim, 128), torch.nn.GELU(), Dropout(0.1), torch.nn.Linear(128, 64), torch.nn.GELU(), Dropout(0.1), torch.nn.Linear(64, output_dim))
+    return torch.nn.Sequential(torch.nn.Linear(input_dim, 128), RReLU(), Dropout(0.1), torch.nn.Linear(128, 64), RReLU(), Dropout(0.1), torch.nn.Linear(64, output_dim))
 
 
 class Experiment(pl.LightningModule):
@@ -218,13 +218,13 @@ if __name__ == "__main__":
         config = yaml.load(f.read(), Loader=yaml.BaseLoader)
     prefix = config["prefix"]
 
-    train_set = torch.load("./materials/mp/Train_fmten_set.pt")
-    validate_set = torch.load("./materials/mp/Valid_fmten_set.pt")
 
+    train_set = StructureFmtEnStreamDataset(Path("./materials/OQMD/Train_set_checked.json"))
+    validate_set = StructureFmtEnStreamDataset(Path("./materials/OQMD/Valid_set_checked.json"))
     train_dataloader = DataLoader(
-        dataset=train_set, batch_size=128, num_workers=2, shuffle=True)
+        dataset=train_set, batch_size=128, num_workers=4, shuffle=True)
     validate_dataloader = DataLoader(
-        dataset=validate_set, batch_size=128, num_workers=2)
+        dataset=validate_set, batch_size=128, num_workers=4)
 
     checkpoint_callback = ModelCheckpoint(
         monitor='val_loss',
