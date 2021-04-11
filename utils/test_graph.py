@@ -1,7 +1,10 @@
 from graph import CrystalEmbedding
 from pymatgen.core.structure import Structure
+from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
-MoS2_structure = Structure.from_file("materials/MoS2_POSCAR")
+MoS2_structure = Structure.from_file("materials/MoS2_mp-2815_conventional_standard.cif")
+space_group_calculater = SpacegroupAnalyzer(MoS2_structure)
+sym_strcut = space_group_calculater.get_symmetrized_structure()
 MoS2_graph = CrystalEmbedding(MoS2_structure)
 atomic_periods = MoS2_graph.get_atomic_periods
 atomic_groups = MoS2_graph.get_atomic_groups

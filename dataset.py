@@ -56,46 +56,35 @@ class StructureRamanDataset(Dataset):
 
 class StructureFmtEnDataset(Dataset):
     @staticmethod
-    def get_input(data):
+    def convert(item):
+        structure = Structure.from_dict(item["structure"])  
+        fmt_en = torch.FloatTensor([item["formation_energy_per_atom"]])
+        graph = CrystalEmbedding(structure,max_atoms=30)
+        encoded_graph = graph.convert_to_model_input()
+        return encoded_graph, fmt_en
+    @classmethod
+    def get_input(cls,data):
         couples = []
         length = len(data)
         for i in range(length):
-            item = data.pop()
-            structure = Structure.from_dict(item["structure"])
+            item = data.pop()           
             try:
-                fmt_en = torch.FloatTensor([item["formation_energy_per_atom"]])
-                graph = CrystalEmbedding(structure,max_atoms=30)
-                encoded_graph = graph.convert_to_model_input()
-            except ValueError:
-                continue
-            except RuntimeError:
-                continue
-            except TypeError:
+                encoded_graph,fmt_en = cls.convert(item)
+            except (ValueError, RuntimeError, TypeError):
                 continue
             couples.append((encoded_graph,fmt_en))
         return couples
-    @staticmethod
-    def split_chunks(data,num_process):
-        length = len(data)
-        chunk_size = length//num_process
-        chunks = [data[i*chunk_size:(i+1)*chunk_size] for i in range(num_process-1)]
-        last_chunk = [data[(num_process-1)*chunk_size:]]
-        chunks.extend(last_chunk)
-        return chunks
-    def __init__(self,data, num_process=1):
-        super().__init__()
+    @classmethod
+    def preprocess(cls,data, num_process=1):
         if num_process != 1:
-            chunks = self.split_chunks(data,num_process)
-            with Pool(num_process) as p:
-                results_list = p.map(self.get_input, chunks)
-            reduced_result = []
-            for i in range(num_process):
-                result = results_list.pop()
-                reduced_result.extend(result)
-            self.data_info = reduced_result
+            mapreducer = MultiProcessMapReducer(cls.get_input,data,num_process)
+            data_info = mapreducer.run()
         else:
-            self.data_info = self.get_input(data)
-        
+            data_info = cls.get_input(data)
+        return cls(data_info)
+    def __init__(self,converted_data):
+        super().__init__()
+        self.data_info = converted_data
     def __getitem__(self, index: str):
         return self.data_info[index]
     def __len__(self) -> int:
@@ -138,8 +127,8 @@ class StructureFmtEnStreamDataset(Dataset):
         encoded_graph,fmt_en = self.convert(self.data[index])
         return (encoded_graph,fmt_en)
         
-class MultiProcessChecker:
-    def __init__(self,checker,data,num_process):
+class MultiProcessMapReducer:
+    def __init__(self,func,data,num_process):
         length = len(data)
         chunk_size = length//num_process
         chunks = [data[i*chunk_size:(i+1)*chunk_size] for i in range(num_process-1)]
@@ -147,10 +136,10 @@ class MultiProcessChecker:
         chunks.extend(last_chunk)
         self.chunks=chunks
         self.num_process = num_process
-        self.checker = checker
-    def check(self):
+        self.func = func
+    def run(self):
         with Pool(self.num_process) as pool:
-            results_list = pool.map(self.checker,self.chunks)
+            results_list = pool.map(self.func,self.chunks)
         reduced_results = []
         for i in range(self.num_process):
             results = results_list.pop()
@@ -161,23 +150,21 @@ class MultiProcessChecker:
 
 class StructureSpaceGroupDataset(StructureFmtEnDataset):
     @staticmethod
-    def get_input(data):
-        couples = []
+    def convert(item):
+        structure = Structure.from_dict(item["structure"])  
+        graph = CrystalEmbedding(structure,max_atoms=30)
+        encoded_graph = graph.convert_to_model_input()
+        space_group_number = encoded_graph["SGN"]
+        return encoded_graph,space_group_number
+    @classmethod
+    def from_fmten_set(cls,dataset:StructureFmtEnDataset):
+        data = dataset.data_info
+        results = []
         for item in data:
-            structure = Structure.from_dict(item["structure"])
-            try:
-                fmt_en = torch.FloatTensor([item["formation_energy_per_atom"]])
-                graph = CrystalEmbedding(structure,max_atoms=30)
-            except ValueError:
-                continue
-            except RuntimeError:
-                continue
-            except TypeError:
-                continue
-            encoded_graph = graph.convert_to_model_input()
+            encoded_graph, fmt_en = item
             space_group_number = encoded_graph["SGN"]
-            couples.append((encoded_graph,space_group_number))
-        return couples
+            results.append((encoded_graph,space_group_number))
+        return cls(results)
 
 class StructureRamanModesDataset(Dataset):
     @staticmethod
@@ -202,27 +189,28 @@ class StructureRamanModesDataset(Dataset):
         return len(self.data_info)
 
 
-def prepare_datesets(json_file):
+def prepare_datesets(json_file,pt_file):
     with open(json_file, "r") as f:
-        data = json.loads(f.read())
-    dataset = StructureFmtEnDataset(data,num_process=4)
-    return dataset
+        data = json.load(f)
+    dataset = StructureFmtEnDataset.preprocess(data)
+    print(len(dataset))
+    torch.save(dataset, pt_file)
+
+def convert_fmten_set_to_spsp_set(fmten_pt_file,spgp_pt_file):
+    fmten_dataset = torch.load(fmten_pt_file)
+    spgp_dataset = StructureSpaceGroupDataset.from_fmten_set(fmten_dataset)
+    torch.save(spgp_dataset,spgp_pt_file)
 
 def check_dataset(in_path:Path,out_path:str):
     with in_path.open() as f:
         data_precheck = json.load(f)
-    mp_checker = MultiProcessChecker(StructureFmtEnStreamDataset.check,data_precheck,3)
-    data_postcheck = mp_checker.check()
+    mp_checker = MultiProcessMapReducer(StructureFmtEnStreamDataset.check,data_precheck,3)
+    data_postcheck = mp_checker.run()
     with open(out_path,"w") as f:
         json.dump(data_postcheck,f)
 
 if __name__=="__main__":
-    prefix = "gdrive/MyDrive/Raman_machine_learning/OQMD/"
-    check_dataset(Path(prefix+"Valid_set.json"),prefix+"Valid_set_checked.json")
-    # train_set = prepare_datesets("materials/OQMD/Train_set.json")
-    # print(len(train_set))
-    # torch.save(train_set,"materials/OQMD/Train_fmten_set.pt")
-
-    # validate_set = prepare_datesets("materials/OQMD/Valid_set.json")
-    # print(len(validate_set))
-    # torch.save(validate_set,"materials/OQMD/Valid_fmten_set.pt")
+    # prefix = "gdrive/MyDrive/Raman_machine_learning/OQMD/"
+    # check_dataset(Path(prefix+"Valid_set.json"),prefix+"Valid_set_checked.json")
+    convert_fmten_set_to_spsp_set("materials/mp/Valid_fmten_set.pt","materials/mp/Valid_spgp_set.pt")
+    # prepare_datesets("materials/mp/Valid_data.json","materials/mp/Valid_fmten_set.pt")

@@ -6,6 +6,7 @@ checkpoint*
 runs/
 materials/mp/
 materials/JVASP/
+materials/OQMD/
 pretrain/
 logs/
 venv/
