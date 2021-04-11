@@ -70,7 +70,7 @@ class StructureFmtEnDataset(Dataset):
             item = data.pop()           
             try:
                 encoded_graph,fmt_en = cls.convert(item)
-            except (ValueError, RuntimeError, TypeError):
+            except (ValueError, RuntimeError, TypeError, KeyError):
                 continue
             couples.append((encoded_graph,fmt_en))
         return couples
@@ -166,33 +166,20 @@ class StructureSpaceGroupDataset(StructureFmtEnDataset):
             results.append((encoded_graph,space_group_number))
         return cls(results)
 
-class StructureRamanModesDataset(Dataset):
+class StructureRamanModesDataset(StructureFmtEnDataset):
     @staticmethod
-    def get_input(data):
-        couples = []
-        for item in data:
-            structure = Structure.from_dict(item["structure"])
-            try:
-                graph = CrystalGraph(structure)
-                raman_modes = torch.FloatTensor([graph.get_raman_mode_numbers()])
-            except RuntimeError:
-                continue
-            encoded_graph = graph.convert_to_model_input()
-            couples.append((encoded_graph,raman_modes))
-        return couples
-    def __init__(self,data):
-        super().__init__()
-        self.data_info = self.get_input(data)
-    def __getitem__(self, index: str):
-        return self.data_info[index]
-    def __len__(self) -> int:
-        return len(self.data_info)
+    def convert(item):
+        structure = IStructure.from_dict(item["structure"])
+        graph = CrystalEmbedding(structure)
+        raman_modes = graph.get_raman_modes()
+        encoded_graph = graph.convert_to_model_input()    
+        return encoded_graph, raman_modes
 
 
 def prepare_datesets(json_file,pt_file):
     with open(json_file, "r") as f:
         data = json.load(f)
-    dataset = StructureFmtEnDataset.preprocess(data)
+    dataset = StructureRamanModesDataset.preprocess(data)
     print(len(dataset))
     torch.save(dataset, pt_file)
 
@@ -212,5 +199,5 @@ def check_dataset(in_path:Path,out_path:str):
 if __name__=="__main__":
     # prefix = "gdrive/MyDrive/Raman_machine_learning/OQMD/"
     # check_dataset(Path(prefix+"Valid_set.json"),prefix+"Valid_set_checked.json")
-    convert_fmten_set_to_spsp_set("materials/mp/Valid_fmten_set.pt","materials/mp/Valid_spgp_set.pt")
-    # prepare_datesets("materials/mp/Valid_data.json","materials/mp/Valid_fmten_set.pt")
+    # convert_fmten_set_to_spsp_set("materials/mp/Valid_fmten_set.pt","materials/mp/Valid_spgp_set.pt")
+    prepare_datesets("materials/OQMD/Valid_set_checked.json","materials/OQMD/Valid_raman_set.pt")

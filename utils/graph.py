@@ -4,6 +4,7 @@ from pymatgen import MPRester
 from pymatgen.optimization.neighbors import find_points_in_spheres
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 import numpy as np
+from pandas import DataFrame
 import torch
 import json
 import re
@@ -40,6 +41,27 @@ class CrystalBase:
         for i, atom in enumerate(self.atoms):
             encoded_atomic_periods[i, atom.row-1] = 1
         return encoded_atomic_periods
+
+    def get_raman_modes(self) -> List[int]:
+        space_group_calculater = SpacegroupAnalyzer(self.structure)
+        symmetrized_structure = space_group_calculater.get_symmetrized_structure()
+        space_group = space_group_calculater.get_space_group_number()
+        wyckoff = symmetrized_structure.wyckoff_symbols
+        with open("utils/reformed_raman_modes.json") as f:
+            raman_table = json.load(f)
+        all_modes = raman_table["all_modes"]
+        mode_check_table = raman_table["all_spgp"][space_group-1]["modes"]
+        mode_check_table = DataFrame.from_dict(mode_check_table)
+        keys = mode_check_table.keys()
+        for i in range(len(all_modes)):
+            mode = all_modes[i]
+            all_modes[i] = 0
+            if mode in keys:
+                modes_with_wyckoff = mode_check_table[mode]
+                for wp in wyckoff:
+                    if modes_with_wyckoff[wp] != 0:
+                        all_modes[i] = 1
+        return all_modes
 
 
 class CrystalGraph(CrystalBase):
@@ -146,26 +168,6 @@ class CrystalGraph(CrystalBase):
                 [int(i[2:]) for i in valence_structure]).sum()
             encoded_valence_electron_number[i, valence_electron_number-1] = 1
         return encoded_valence_electron_number
-
-    def get_raman_mode_numbers(self):
-        space_group_calculater = SpacegroupAnalyzer(self.structure)
-        symmetrized_structure = space_group_calculater.get_symmetrized_structure()
-        space_group = symmetrized_structure.spacegroup.int_number
-        wyckoff = symmetrized_structure.wyckoff_letters
-        wyckoff_letter, wyckoff_count = np.unique(wyckoff, return_counts=True)
-        wyckoff = [f"{count}{letter}" for count,
-                   letter in zip(wyckoff_count, wyckoff_letter)]
-        with open("utils/raman_modes.json", "r") as f:
-            raman_table = json.loads(f.read())
-        space_group_modes = []
-        for modes in raman_table:
-            if modes["SpaceGroupIndex"] == space_group:
-                space_group_modes.append(modes)
-        num_raman = 0
-        for modes in space_group_modes:
-            if modes["WP"] in wyckoff:
-                num_raman += modes["num_modes"]
-        return num_raman
 
     def encode_bond_length_with_Gaussian_distance(self, min_length: float = 0.0, max_length: float = 5.0, intervals: int = 100, expand_width: float = 0.5) -> np.ndarray:
         bond_length = self.bond_length
