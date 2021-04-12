@@ -200,7 +200,7 @@ if __name__ == "__main__":
         trainer.tune(experiment, train_dataloader, validate_dataloader)
     else:
         if checkpoint_path != None:
-            trainer = pl.Trainer(resume_from_checkpoint=path, gpus=1 if torch.cuda.is_available(
+            trainer = pl.Trainer(resume_from_checkpoint=checkpoint_path, gpus=1 if torch.cuda.is_available(
             ) else 0, logger=logger, callbacks=[checkpoint_callback], max_epochs=epochs)
         else:
             trainer = pl.Trainer(gpus=1 if torch.cuda.is_available() else 0, logger=logger,

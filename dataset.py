@@ -200,4 +200,4 @@ if __name__=="__main__":
     # prefix = "gdrive/MyDrive/Raman_machine_learning/OQMD/"
     # check_dataset(Path(prefix+"Valid_set.json"),prefix+"Valid_set_checked.json")
     # convert_fmten_set_to_spsp_set("materials/mp/Valid_fmten_set.pt","materials/mp/Valid_spgp_set.pt")
-    prepare_datesets("materials/OQMD/Valid_set_checked.json","materials/OQMD/Valid_raman_set.pt")
+    prepare_datesets("materials/OQMD/Train_set_checked.json","materials/OQMD/Train_raman_set.pt")

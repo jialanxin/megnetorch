@@ -192,28 +192,29 @@ def model_config(optim_type,optim_lr,optim_weight_decay):
 
 
 if __name__ == "__main__":
-    prefix = "/home/jlx/v0.4.7/1.pretrain_fmten_oqmd/"
+    prefix = "/home/jlx/v0.4.7/3.pretrain_fmten_mp/"
     trainer_config = "fit"
     checkpoint_path = None
-    model_hpparams = model_config(optim_type="AdamW",optim_lr=1e-4,optim_weight_decay=0)
+    model_hpparams = model_config(optim_type="AdamW",optim_lr=1e-5,optim_weight_decay=0)
     # train_set_part = 1
     # epochs = 250*train_set_part
     epochs=1000
+    batch_size = 128
 
     # train_set = torch.load(f"./materials/OQMD/Train_fmten_set_part_{train_set_part}.pt")
-    train_set = torch.load("./materials/OQMD/Train_fmten_set.pt")
-    validate_set = torch.load("./materials/OQMD/Valid_fmten_set.pt")
+    train_set = torch.load("./materials/mp/Train_fmten_set.pt")
+    validate_set = torch.load("./materials/mp/Valid_fmten_set.pt")
     train_dataloader = DataLoader(
-        dataset=train_set, batch_size=512, num_workers=4, shuffle=True)
+        dataset=train_set, batch_size=batch_size, num_workers=4, shuffle=True)
     validate_dataloader = DataLoader(
-        dataset=validate_set, batch_size=512, num_workers=4)
+        dataset=validate_set, batch_size=batch_size, num_workers=4)
 
     checkpoint_callback = ModelCheckpoint(
         monitor='val_loss',
         save_top_k=3,
         mode='min',
     )
-    experiment = Experiment(**model_hpparams)
+    experiment = Experiment.load_from_checkpoint("pretrain/fmten/epoch=821-step=925571.ckpt")
 
     
     logger = TensorBoardLogger(prefix)
