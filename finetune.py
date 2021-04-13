@@ -20,7 +20,7 @@ def ff(input_dim):
 
 
 def ff_output(input_dim, output_dim):
-    return torch.nn.Sequential(torch.nn.Linear(input_dim, 128), torch.nn.RReLU(), Dropout(0.3), torch.nn.Linear(128, 128), torch.nn.RReLU(), Dropout(0.3), torch.nn.Linear(128, output_dim))
+    return torch.nn.Sequential(torch.nn.Linear(input_dim, output_dim) )#, torch.nn.RReLU(), Dropout(0.3), torch.nn.Linear(128, 128), torch.nn.RReLU(), Dropout(0.3), torch.nn.Linear(128, output_dim))
 
 
 class Experiment(pl.LightningModule):
@@ -31,10 +31,10 @@ class Experiment(pl.LightningModule):
         fmten_model = FmtEn.load_from_checkpoint("pretrain/fmten/epoch=821-step=925571.ckpt")
         spgp_model = SPGP.load_from_checkpoint(
             "pretrain/spacegroup/epoch=713-step=359855.ckpt")
-        self.atom_embedding = spgp_model.atom_embedding
-        self.atomic_number_embedding = spgp_model.atomic_number_embedding
+        self.atom_embedding = fmten_model.atom_embedding
+        self.atomic_number_embedding = fmten_model.atomic_number_embedding
         self.space_group_number_embedding = fmten_model.space_group_number_embedding
-        self.mendeleev_number_embedding = spgp_model.mendeleev_number_embedding
+        self.mendeleev_number_embedding = fmten_model.mendeleev_number_embedding
         self.position_embedding = spgp_model.position_embedding
         self.lattice_embedding = spgp_model.lattice_embedding
         self.encoder = spgp_model.encoder
@@ -313,7 +313,7 @@ def model_config(optim_type,optim_lr,optim_weight_decay):
 
 
 if __name__ == "__main__":
-    prefix = "/home/jlx/v0.4.7/6.finetune/"
+    prefix = "/home/jlx/v0.4.7/7.finetune_linear_output/"
     trainer_config = "fit"
     checkpoint_path = None
     model_hpparams = model_config(optim_type="AdamW",optim_lr=1e-4,optim_weight_decay=1e-2)

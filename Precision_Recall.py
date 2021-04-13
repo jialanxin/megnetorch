@@ -10,7 +10,7 @@ class Experiment(Finetune):
     def __init__(self):
         super().__init__()
         pretrain_model = Finetune.load_from_checkpoint(
-            "pretrain/finetuned/epoch=1992-step=99649.ckpt")
+            "pretrain/finetuned/epoch=878-step=43949.ckpt")
         self.atom_embedding = pretrain_model.atom_embedding
         self.atomic_number_embedding = pretrain_model.atomic_number_embedding
         self.mendeleev_number_embedding = pretrain_model.mendeleev_number_embedding
