@@ -10,7 +10,7 @@ class Experiment(Finetune):
     def __init__(self):
         super().__init__()
         pretrain_model = Finetune.load_from_checkpoint(
-            "pretrain/finetuned/epoch=1999-step=99999.ckpt")
+            "pretrain/finetuned/epoch=1992-step=99649.ckpt")
         self.atom_embedding = pretrain_model.atom_embedding
         self.atomic_number_embedding = pretrain_model.atomic_number_embedding
         self.mendeleev_number_embedding = pretrain_model.mendeleev_number_embedding
@@ -102,7 +102,7 @@ if __name__ == "__main__":
     validate_dataloader = DataLoader(
         dataset=validate_set, batch_size=len(validate_set), num_workers=1)
     model = Experiment().eval()
-    fig = NMS_or_not(model, validate_dataloader,nms=True)
+    fig = NMS_or_not(model, validate_dataloader,nms=False)
     fig.show()
 
 # Train:  loss_weight_6_sign

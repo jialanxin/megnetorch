@@ -20,7 +20,7 @@ def ff(input_dim):
 
 
 def ff_output(input_dim, output_dim):
-    return torch.nn.Sequential(torch.nn.Linear(input_dim, 128), torch.nn.RReLU(), Dropout(0.3), torch.nn.Linear(128, 64), torch.nn.RReLU(), Dropout(0.3), torch.nn.Linear(64, output_dim))
+    return torch.nn.Sequential(torch.nn.Linear(input_dim, 128), torch.nn.RReLU(), Dropout(0.3), torch.nn.Linear(128, 128), torch.nn.RReLU(), Dropout(0.3), torch.nn.Linear(128, output_dim))
 
 
 class Experiment(pl.LightningModule):
@@ -28,14 +28,13 @@ class Experiment(pl.LightningModule):
         super().__init__()
         self.save_hyperparameters()
         self.lr = lr
-        fmten_model = FmtEn.load_from_checkpoint(
-            "pretrain/fmten/epoch=837-step=422351.ckpt")
+        fmten_model = FmtEn.load_from_checkpoint("pretrain/fmten/epoch=821-step=925571.ckpt")
         spgp_model = SPGP.load_from_checkpoint(
-            "pretrain/spacegroup/epoch=973-step=490895.ckpt")
-        self.atom_embedding = fmten_model.atom_embedding
-        self.atomic_number_embedding = fmten_model.atomic_number_embedding
+            "pretrain/spacegroup/epoch=713-step=359855.ckpt")
+        self.atom_embedding = spgp_model.atom_embedding
+        self.atomic_number_embedding = spgp_model.atomic_number_embedding
         self.space_group_number_embedding = fmten_model.space_group_number_embedding
-        self.mendeleev_number_embedding = fmten_model.mendeleev_number_embedding
+        self.mendeleev_number_embedding = spgp_model.mendeleev_number_embedding
         self.position_embedding = spgp_model.position_embedding
         self.lattice_embedding = spgp_model.lattice_embedding
         self.encoder = spgp_model.encoder
@@ -304,42 +303,24 @@ class Experiment(pl.LightningModule):
         return [optimizer], [schedualer]
 
 
-def model_config(config):
+def model_config(optim_type,optim_lr,optim_weight_decay):
     params = {}
-    try:
-        num_enc = int(config["model"]["num_of_encoder"])
-        params["num_conv"] = num_enc
-    except:
-        pass
-    try:
-        optim_type = config["optimizer"]["type"]
-        if optim_type == "AdamW":
-            params["optim_type"] = "AdamW"
-    except:
-        pass
-    try:
-        optim_lr = float(config["optimizer"]["lr"])
-        params["lr"] = optim_lr
-    except:
-        pass
-    try:
-        optim_weight_decay = float(config["optimizer"]["weight_decay"])
-        params["weight_decay"] = optim_weight_decay
-    except:
-        pass
+    if optim_type == "AdamW":
+        params["optim_type"] = "AdamW"
+    params["lr"] = optim_lr
+    params["weight_decay"] = optim_weight_decay
     return params
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Select a train_config.yaml file")
-    parser.add_argument(dest="filename", metavar="/path/to/file")
-    arg = parser.parse_args()
-    path_to_file = arg.filename
-    with open(path_to_file, "r") as f:
-        config = yaml.load(f.read(), Loader=yaml.BaseLoader)
-    prefix = config["prefix"]
-    warnings.simplefilter('always', UserWarning)
+    prefix = "/home/jlx/v0.4.7/6.finetune/"
+    trainer_config = "fit"
+    checkpoint_path = None
+    model_hpparams = model_config(optim_type="AdamW",optim_lr=1e-4,optim_weight_decay=1e-2)
+    # train_set_part = 1
+    # epochs = 250*train_set_part
+    epochs=2000
+    batch_size=128
 
     checkpoint_callback = ModelCheckpoint(
         monitor='val_loss_weighed',
@@ -351,30 +332,23 @@ if __name__ == "__main__":
     validate_set = torch.load(
         "materials/JVASP/Valid_raman_set_25_uneq_yolov1.pt")
     train_dataloader = DataLoader(
-        dataset=train_set, batch_size=128, num_workers=2, shuffle=True)
+        dataset=train_set, batch_size=128, num_workers=4, shuffle=True)
     validate_dataloader = DataLoader(
-        dataset=validate_set, batch_size=128, num_workers=2)
+        dataset=validate_set, batch_size=128, num_workers=4)
 
-    try:
-        path = config["checkpoint"]
-        experiment = Experiment.load_from_checkpoint(path)
-    except KeyError:
-        model_hpparams = model_config(config)
-        print(model_hpparams)
-        experiment = Experiment(**model_hpparams)
 
-    trainer_config = config["trainer"]
+    experiment = Experiment(**model_hpparams)
+
     logger = TensorBoardLogger(prefix)
     if trainer_config == "tune":
         trainer = pl.Trainer(gpus=1 if torch.cuda.is_available() else 0, logger=logger, callbacks=[
             checkpoint_callback], auto_lr_find=True)
         trainer.tune(experiment, train_dataloader, validate_dataloader)
     else:
-        try:
-            path = config["checkpoint"]
-            trainer = pl.Trainer(resume_from_checkpoint=path, gpus=1 if torch.cuda.is_available(
-            ) else 0, logger=logger, callbacks=[checkpoint_callback], max_epochs=2000)
-        except KeyError:
+        if checkpoint_path != None:
+            trainer = pl.Trainer(resume_from_checkpoint=checkpoint_path, gpus=1 if torch.cuda.is_available(
+            ) else 0, logger=logger, callbacks=[checkpoint_callback], max_epochs=epochs)
+        else:
             trainer = pl.Trainer(gpus=1 if torch.cuda.is_available() else 0, logger=logger,
-                                 callbacks=[checkpoint_callback],  max_epochs=2000)
+                                 callbacks=[checkpoint_callback],  max_epochs=epochs)
         trainer.fit(experiment, train_dataloader, validate_dataloader)
