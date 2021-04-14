@@ -13,7 +13,7 @@ from torch.nn import Embedding, RReLU, ReLU, Dropout
 from dataset import StructureRamanDataset
 from pretrain_fmten import Experiment as FmtEn
 from pretrain_spgp import Experiment as SPGP
-
+from cos_anneal.cosine_annearing_with_warmup import CosineAnnealingWarmupRestarts
 
 def ff(input_dim):
     return torch.nn.Sequential(torch.nn.Linear(input_dim, 128))
@@ -298,8 +298,7 @@ class Experiment(pl.LightningModule):
         else:
             optimizer = torch.optim.Adam(
                 self.parameters(), lr=self.lr, weight_decay=self.hparams.weight_decay)
-        schedualer = torch.optim.lr_scheduler.CosineAnnealingLR(
-            optimizer, T_max=64)
+        schedualer = CosineAnnealingWarmupRestarts(optimizer=optimizer,first_cycle_steps=200,max_lr=self.hparams.lr,min_lr=0,warmup_steps=30)
         return [optimizer], [schedualer]
 
 
@@ -313,14 +312,14 @@ def model_config(optim_type,optim_lr,optim_weight_decay):
 
 
 if __name__ == "__main__":
-    prefix = "/home/jlx/v0.4.7/7.finetune_linear_output/"
+    prefix = "/home/jlx/v0.4.7/8.finetune_linear_output_cos_warmup/"
     trainer_config = "fit"
     checkpoint_path = None
-    model_hpparams = model_config(optim_type="AdamW",optim_lr=1e-4,optim_weight_decay=1e-2)
+    model_hpparams = model_config(optim_type="AdamW",optim_lr=2e-5,optim_weight_decay=1e-2)
     # train_set_part = 1
     # epochs = 250*train_set_part
     epochs=2000
-    batch_size=128
+    batch_size=32
 
     checkpoint_callback = ModelCheckpoint(
         monitor='val_loss_weighed',
@@ -332,9 +331,9 @@ if __name__ == "__main__":
     validate_set = torch.load(
         "materials/JVASP/Valid_raman_set_25_uneq_yolov1.pt")
     train_dataloader = DataLoader(
-        dataset=train_set, batch_size=128, num_workers=4, shuffle=True)
+        dataset=train_set, batch_size=batch_size, num_workers=4, shuffle=True)
     validate_dataloader = DataLoader(
-        dataset=validate_set, batch_size=128, num_workers=4)
+        dataset=validate_set, batch_size=batch_size, num_workers=4)
 
 
     experiment = Experiment(**model_hpparams)

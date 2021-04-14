@@ -10,3 +10,4 @@ materials/OQMD/
 pretrain/
 logs/
 venv/
+*.png
