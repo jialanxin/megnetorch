@@ -1,4 +1,5 @@
 import json
+from typing import overload
 
 import numpy as np
 import plotly.graph_objects as go
@@ -84,9 +85,9 @@ def count_incorrects(ramans, predict_confidence_round):
     target_confidence = ramans[:, 0]
     target_position = ramans[:, 1]
     target_position = absolute_position(target_position).flatten()
-    incorrects = torch.not_equal(
-        target_confidence, predict_confidence_round).float().sum()
-    return incorrects, target_confidence, target_position
+    more = torch.greater(predict_confidence_round,target_confidence).float().sum().detach().item()
+    less = torch.less(predict_confidence_round,target_confidence).float().sum().detach().item()
+    return more,less, target_confidence, target_position
 
 
 def absolute_position(relative_postition):
@@ -108,7 +109,8 @@ def save_loss_formula(Train_or_Valid="Valid"):
     dataloader = DataLoader(dataset=dataset, batch_size=1)
     model = Experiment()
     formula_list = []
-    incorrect_list = []
+    more_list = []
+    less_list = []
     target_confidence_list = []
     target_position_list = []
     predicted_confidence_list = []
@@ -120,31 +122,38 @@ def save_loss_formula(Train_or_Valid="Valid"):
         predicted_spectrum = model(input)
         predicted_confidence, predicted_position, predicted_confidence_round = NMS_or_not(
             predicted_spectrum)
-        incorrects, target_confidence, target_position = count_incorrects(
+        more,less, target_confidence, target_position = count_incorrects(
             ramans, predicted_confidence_round)
         formula_list.append(formula[0])
-        incorrect_list.append(incorrects)
+        more_list.append(more)
+        less_list.append(less)
         target_confidence_list.append(target_confidence)
         target_position_list.append(target_position)
         predicted_confidence_list.append(predicted_confidence)
         predicted_position_list.append(predicted_position)
         mp_id_list.append(mp_id)
-    torch.save({"formula": formula_list, "incorrect": incorrect_list, "target_confidence": target_confidence_list, "target_position": target_position_list,
+    torch.save({"formula": formula_list, "more":more_list,"less":less_list, "target_confidence": target_confidence_list, "target_position": target_position_list,
                 "predicted_confidence": predicted_confidence_list, "predicted_position": predicted_position_list, "mp_id": mp_id_list}, f"materials/JVASP/{Train_or_Valid}_loss_formula_yolo.pt")
 
 
 def load_loss_formula(Train_or_Valid="Valid"):
     data = torch.load(f"materials/JVASP/{Train_or_Valid}_loss_formula_yolo.pt")
-    return  data["formula"], data["incorrect"], data["target_confidence"], data["target_position"], data["predicted_confidence"],data["predicted_position"],data["mp_id"]
+    return  data["formula"], data["more"],data["less"], data["target_confidence"], data["target_position"], data["predicted_confidence"],data["predicted_position"],data["mp_id"]
 
 
 def plot_points(Train_or_Valid="Valid"):
-    formula,incorrect, _, _,_,_,_ = load_loss_formula(Train_or_Valid)
-    fig = make_subplots(rows=2,cols=1)
-    fig.add_trace(go.Scatter(x=formula, y=incorrect, mode="markers",
+    formula,more,less, _, _,_,_,_ = load_loss_formula(Train_or_Valid)
+    fig = make_subplots(rows=2,cols=2,subplot_titles=("Number of modes more than target","Number of modes less than target","more hist","less hist"))
+    fig.add_trace(go.Scatter(x=formula, y=more, mode="markers",
                              marker=dict(size=5 if Train_or_Valid == "Valid" else 2)),col=1,row=1)
-    count, value = np.histogram(incorrect,bins=19)
+    count, value = np.histogram(more,bins=15)
     fig.add_trace(go.Scatter(x=value,y=count),col=1,row=2)
+
+    fig.add_trace(go.Scatter(x=formula, y=less, mode="markers",
+                             marker=dict(size=5 if Train_or_Valid == "Valid" else 2)),col=2,row=1)
+    count, value = np.histogram(less,bins=9)
+    fig.add_trace(go.Scatter(x=value,y=count),col=2,row=2)
+
     fig.update_layout(showlegend=False)
     return fig
 
@@ -160,13 +169,14 @@ def process_y(x, confidence, position,cut_off=0.5):
 
 
 def search_formula(formula, Train_or_Valid="Valid", cut_off=0.5):
-    formula_list, incorrect,target_confidence,target_position, predict_confidence,predict_position,mp_id = load_loss_formula(Train_or_Valid)
+    formula_list, more,less,target_confidence,target_position, predict_confidence,predict_position,mp_id = load_loss_formula(Train_or_Valid)
     index = formula_list.index(formula)
     target_confidence = target_confidence[index]
     target_position = target_position[index]
     predict_confidence = predict_confidence[index]
     predict_position = predict_position[index]
-    incorrect = incorrect[index]
+    more = more[index]
+    less = less[index]
     mp_id = mp_id[index][0]
     fig = go.Figure()
     x = torch.linspace(100, 1100, 10000)
@@ -174,7 +184,7 @@ def search_formula(formula, Train_or_Valid="Valid", cut_off=0.5):
     predict = process_y(x, predict_confidence,predict_position, cut_off)
     fig.add_trace(go.Scatter(x=x, y=raman, name="lable"))
     fig.add_trace(go.Scatter(x=x, y=predict, name="predict"))
-    return fig, incorrect, mp_id
+    return fig, more,less, mp_id
 
 
 if __name__ == "__main__":
@@ -185,9 +195,9 @@ if __name__ == "__main__":
     st.write(fig_valid)
     formula_valid = st.text_input("Insert a formula", "Ta4 Si2")
     cut_off_valid = st.slider("ignore confidence under cutoff", min_value=0.0, max_value=1.0, value=0.5, key="Valid")
-    fig_valid_search,incorrect_valid,mp_id_valid = search_formula(formula_valid, "Valid",cut_off_valid)
+    fig_valid_search,more_valid,less_valid,mp_id_valid = search_formula(formula_valid, "Valid",cut_off_valid)
     st.write(fig_valid_search)
-    st.write(f"incorrectness:{incorrect_valid}")
+    st.write(f"more:{more_valid}, less:{less_valid}")
     st.write(f"mp_link: https://www.materialsproject.org/materials/mp-{mp_id_valid}")
     # st.header("Loss of Train Set")
     # fig_train = plot_points("Train")
