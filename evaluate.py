@@ -18,7 +18,7 @@ class Experiment(Finetune):
         self.save_hyperparameters()
         self.lr = lr
         pretrain_model = Finetune.load_from_checkpoint(
-            "pretrain/finetuned/epoch=1999-step=99999.ckpt")
+            "pretrain/finetuned/epoch=1499-step=74999.ckpt")
         self.atom_embedding = pretrain_model.atom_embedding
         self.atomic_number_embedding = pretrain_model.atomic_number_embedding
         self.mendeleev_number_embedding = pretrain_model.mendeleev_number_embedding
@@ -146,12 +146,12 @@ def plot_points(Train_or_Valid="Valid"):
     fig = make_subplots(rows=2,cols=2,subplot_titles=("Number of modes more than target","Number of modes less than target","more hist","less hist"))
     fig.add_trace(go.Scatter(x=formula, y=more, mode="markers",
                              marker=dict(size=5 if Train_or_Valid == "Valid" else 2)),col=1,row=1)
-    count, value = np.histogram(more,bins=15)
+    count, value = np.histogram(more,bins=12)
     fig.add_trace(go.Scatter(x=value,y=count),col=1,row=2)
 
     fig.add_trace(go.Scatter(x=formula, y=less, mode="markers",
                              marker=dict(size=5 if Train_or_Valid == "Valid" else 2)),col=2,row=1)
-    count, value = np.histogram(less,bins=9)
+    count, value = np.histogram(less,bins=10)
     fig.add_trace(go.Scatter(x=value,y=count),col=2,row=2)
 
     fig.update_layout(showlegend=False)

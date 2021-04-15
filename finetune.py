@@ -21,7 +21,7 @@ def ff_output(input_dim, output_dim):
 
 
 class Experiment(pl.LightningModule):
-    def __init__(self, optim_type="Adam", lr=1e-3, weight_decay=0.0):
+    def __init__(self, optim_type="Adam", lr=1e-3, weight_decay=0.0, coord = 3.0):
         super().__init__()
         self.save_hyperparameters()
         self.lr = lr
@@ -184,8 +184,7 @@ class Experiment(pl.LightningModule):
         # print(f"A:{Accuracy} P:{Precision} R:{Recall} F:{F1score}")
         return Accuracy, Precision, Recall, F1score
 
-    @staticmethod
-    def yolov1_loss(raman, predict):
+    def yolov1_loss(self, raman, predict):
         # raman (batch_size, wavelength_clips, 2) # predict (batch_size, wavelength_clips, workers, 2)
         position_label = raman[:, :, 1]  # (batch_size, wavelength_clips)
         # (batch_size, wavelength_clips,workers)
@@ -226,7 +225,7 @@ class Experiment(pl.LightningModule):
             object_confidence_target, object_predict[:, 0], reduction="sum")
 
         loss = 0.2*nonobject_confidence_loss + \
-            object_confidence_loss+5*object_position_loss
+            object_confidence_loss+self.hparams.coord*object_position_loss
         batch_size = raman.shape[0]
         loss = loss/batch_size
         return loss
@@ -310,24 +309,25 @@ class Experiment(pl.LightningModule):
         return [optimizer], [schedualer]
 
 
-def model_config(optim_type, optim_lr, optim_weight_decay):
+def model_config(optim_type, optim_lr, optim_weight_decay,model_coord):
     params = {}
     if optim_type == "AdamW":
         params["optim_type"] = "AdamW"
     params["lr"] = optim_lr
     params["weight_decay"] = optim_weight_decay
+    params["coord"] = model_coord
     return params
 
 
 if __name__ == "__main__":
-    prefix = "/home/jlx/v0.4.7/10.finetune_layer_12/"
+    prefix = "/home/jlx/v0.4.7/11.finetune_coord/"
     trainer_config = "fit"
     checkpoint_path = None
     model_hpparams = model_config(
-        optim_type="AdamW", optim_lr=5e-5, optim_weight_decay=1e-1)
+        optim_type="AdamW", optim_lr=5e-5, optim_weight_decay=5e-1,model_coord= 1.0)
     # train_set_part = 1
     # epochs = 250*train_set_part
-    epochs = 2000
+    epochs = 1500
     batch_size = 128
 
     checkpoint_callback = ModelCheckpoint(
