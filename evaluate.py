@@ -88,7 +88,8 @@ def count_incorrects(ramans, predict_confidence_round):
     more = torch.greater(predict_confidence_round,target_confidence).float().sum().detach().item()
     less = torch.less(predict_confidence_round,target_confidence).float().sum().detach().item()
     incorrect = more+less
-    return more,less,incorrect, target_confidence, target_position
+    total = target_confidence.float().sum().detach().item()
+    return more,less,incorrect,total, target_confidence, target_position
 
 
 def absolute_position(relative_postition):
@@ -113,6 +114,7 @@ def save_loss_formula(Train_or_Valid="Valid"):
     more_list = []
     less_list = []
     incorrect_list = []
+    total_list = []
     target_confidence_list = []
     target_position_list = []
     predicted_confidence_list = []
@@ -124,29 +126,30 @@ def save_loss_formula(Train_or_Valid="Valid"):
         predicted_spectrum = model(input)
         predicted_confidence, predicted_position, predicted_confidence_round = NMS_or_not(
             predicted_spectrum)
-        more,less,incorrect, target_confidence, target_position = count_incorrects(
+        more,less,incorrect,total, target_confidence, target_position = count_incorrects(
             ramans, predicted_confidence_round)
         formula_list.append(formula[0])
         more_list.append(more)
         less_list.append(less)
+        total_list.append(total)
         incorrect_list.append(incorrect)
         target_confidence_list.append(target_confidence)
         target_position_list.append(target_position)
         predicted_confidence_list.append(predicted_confidence)
         predicted_position_list.append(predicted_position)
         mp_id_list.append(mp_id)
-    torch.save({"formula": formula_list, "more":more_list,"less":less_list,"incorrect":incorrect_list, "target_confidence": target_confidence_list, "target_position": target_position_list,
+    torch.save({"formula": formula_list, "more":more_list,"less":less_list,"incorrect":incorrect_list,"total":total_list, "target_confidence": target_confidence_list, "target_position": target_position_list,
                 "predicted_confidence": predicted_confidence_list, "predicted_position": predicted_position_list, "mp_id": mp_id_list}, f"materials/JVASP/{Train_or_Valid}_loss_formula_yolo.pt")
 
 
 def load_loss_formula(Train_or_Valid="Valid"):
     data = torch.load(f"materials/JVASP/{Train_or_Valid}_loss_formula_yolo.pt")
-    return  data["formula"], data["more"],data["less"],data["incorrect"], data["target_confidence"], data["target_position"], data["predicted_confidence"],data["predicted_position"],data["mp_id"]
+    return  data["formula"], data["more"],data["less"],data["incorrect"],data["total"], data["target_confidence"], data["target_position"], data["predicted_confidence"],data["predicted_position"],data["mp_id"]
 
 
 def plot_points(Train_or_Valid="Valid"):
-    formula,more,less,incorrect, _, _,_,_,_ = load_loss_formula(Train_or_Valid)
-    fig = make_subplots(rows=3,cols=2,subplot_titles=("Number of modes more than target","Number of modes less than target","more hist","less hist","incorrect hist"))
+    formula,more,less,incorrect,total, _, _,_,_,_ = load_loss_formula(Train_or_Valid)
+    fig = make_subplots(rows=3,cols=2,subplot_titles=("Number of modes more than target","Number of modes less than target","more hist","less hist","incorrect hist","incorrect-total"))
     fig.add_trace(go.Scatter(x=formula, y=more, mode="markers",
                              marker=dict(size=5 if Train_or_Valid == "Valid" else 2)),col=1,row=1)
     count, value = np.histogram(more,bins=12)
@@ -158,6 +161,12 @@ def plot_points(Train_or_Valid="Valid"):
     fig.add_trace(go.Scatter(x=value,y=count),col=2,row=2)
     count,value = np.histogram(incorrect,bins=15)
     fig.add_trace(go.Scatter(x=value,y=count),col=1,row=3)
+    total = np.array(total)
+    incorrect= np.array(incorrect)
+    shape = total.shape[0]
+    total = total+np.random.rand(shape)*0.5-0.25
+    incorrect = incorrect+np.random.rand(shape)*0.5-0.25
+    fig.add_trace(go.Scatter(x=total+np.random.rand(),y=incorrect,mode="markers"),col=2,row=3)
     fig.update_layout(showlegend=False)
     return fig
 
@@ -173,7 +182,7 @@ def process_y(x, confidence, position,cut_off=0.5):
 
 
 def search_formula(formula, Train_or_Valid="Valid", cut_off=0.5):
-    formula_list, more,less,_,target_confidence,target_position, predict_confidence,predict_position,mp_id = load_loss_formula(Train_or_Valid)
+    formula_list, more,less,_,_,target_confidence,target_position, predict_confidence,predict_position,mp_id = load_loss_formula(Train_or_Valid)
     index = formula_list.index(formula)
     target_confidence = target_confidence[index]
     target_position = target_position[index]
