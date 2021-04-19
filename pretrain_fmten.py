@@ -1,6 +1,3 @@
-import argparse
-from pytorch_lightning.accelerators import accelerator
-import yaml
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
@@ -8,12 +5,11 @@ from torch.utils.data import DataLoader
 import torch
 import torch.nn.functional as F
 from dataset import StructureFmtEnDataset
-from pathlib import Path
-from torch.nn import Embedding, RReLU, ReLU, Dropout
+from cos_anneal.cosine_annearing_with_warmup import CosineAnnealingWarmupRestarts
 
 
 def ff(input_dim):
-    return torch.nn.Sequential(torch.nn.Linear(input_dim, 256))
+    return torch.nn.Sequential(torch.nn.Linear(input_dim, 48))
 
 
 def ff_output(input_dim, output_dim):
@@ -28,18 +24,18 @@ class Experiment(pl.LightningModule):
         self.lr = lr
         self.atom_embedding = ff(459)
         self.atomic_number_embedding = torch.nn.Embedding(
-            num_embeddings=95, embedding_dim=256, padding_idx=0)
+            num_embeddings=95, embedding_dim=48, padding_idx=0)
         self.mendeleev_number_embedding = torch.nn.Embedding(
-            num_embeddings=104, embedding_dim=256, padding_idx=0)
+            num_embeddings=104, embedding_dim=48, padding_idx=0)
         self.space_group_number_embedding = torch.nn.Embedding(
-            num_embeddings=230, embedding_dim=256)
+            num_embeddings=230, embedding_dim=48)
         self.position_embedding = ff(240)
         self.lattice_embedding = ff(800)
         encode_layer = torch.nn.TransformerEncoderLayer(
-            d_model=256, nhead=8, dim_feedforward=1024)
+            d_model=48, nhead=8, dim_feedforward=192)
         self.encoder = torch.nn.TransformerEncoder(
             encode_layer, num_layers=12)
-        self.readout = ff_output(input_dim=256, output_dim=1)
+        self.readout = ff_output(input_dim=48, output_dim=1)
 
     @staticmethod
     def Gassian_expand(value_list, min_value, max_value, intervals, expand_width):
@@ -179,8 +175,8 @@ class Experiment(pl.LightningModule):
         else:
             optimizer = torch.optim.Adam(
                 self.parameters(), lr=self.lr, weight_decay=self.hparams.weight_decay)
-        schedualer = torch.optim.lr_scheduler.CosineAnnealingLR(
-            optimizer, T_max=64)
+        schedualer = CosineAnnealingWarmupRestarts(
+            optimizer=optimizer, first_cycle_steps=200, max_lr=self.hparams.lr, min_lr=0, warmup_steps=30)
         return [optimizer], [schedualer]
 
 
@@ -194,17 +190,17 @@ def model_config(optim_type, optim_lr, optim_weight_decay):
 
 
 if __name__ == "__main__":
-    prefix = "/home/jlx/v0.4.7/4.pretrain_fmten_oqmd_layer_12/"
+    prefix = "/home/jlx/v0.4.7/13.pretrain_fmten_oqmd_dim_48/"
     trainer_config = "fit"
-    checkpoint_path = "pretrain/fmten/epoch=570-step=642945.ckpt"
+    checkpoint_path = None
     model_hpparams = model_config(
-        optim_type="AdamW", optim_lr=1e-4, optim_weight_decay=0)
+        optim_type="AdamW", optim_lr=1e-3, optim_weight_decay=0)
     # train_set_part = 1
     # epochs = 250*train_set_part
     epochs = 1000
-    batch_size = 256
-    gpus = 2 if torch.cuda.is_available() else 0
-    acce = "ddp"
+    batch_size = 512
+    gpus = 1 if torch.cuda.is_available() else 0
+    acce = None
 
     # train_set = torch.load(f"./materials/OQMD/Train_fmten_set_part_{train_set_part}.pt")
     train_set = torch.load("./materials/OQMD/Train_fmten_set.pt")
