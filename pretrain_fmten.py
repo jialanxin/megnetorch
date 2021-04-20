@@ -176,7 +176,7 @@ class Experiment(pl.LightningModule):
             optimizer = torch.optim.Adam(
                 self.parameters(), lr=self.lr, weight_decay=self.hparams.weight_decay)
         schedualer = CosineAnnealingWarmupRestarts(
-            optimizer=optimizer, first_cycle_steps=200, max_lr=self.hparams.lr, min_lr=0, warmup_steps=30)
+            optimizer=optimizer, first_cycle_steps=200, max_lr=self.hparams.lr, min_lr=0, warmup_steps=30, gamma=0.6)
         return [optimizer], [schedualer]
 
 
