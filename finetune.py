@@ -23,16 +23,16 @@ class Backbone(pl.LightningModule):
     def __init__(self):
         super().__init__()
         fmten_model = FmtEn.load_from_checkpoint(
-            "pretrain/fmten/epoch=585-step=659835.ckpt")
-        spgp_model = SPGP.load_from_checkpoint(
-            "pretrain/spacegroup/epoch=774-step=872649.ckpt")
+            "pretrain/fmten/epoch=596-step=672221.ckpt")
+        # spgp_model = SPGP.load_from_checkpoint(
+            # "pretrain/spacegroup/epoch=774-step=872649.ckpt")
         self.atom_embedding = fmten_model.atom_embedding
         self.atomic_number_embedding = fmten_model.atomic_number_embedding
         self.space_group_number_embedding = fmten_model.space_group_number_embedding
         self.mendeleev_number_embedding = fmten_model.mendeleev_number_embedding
-        self.position_embedding = spgp_model.position_embedding
-        self.lattice_embedding = spgp_model.lattice_embedding
-        encoder = spgp_model.encoder
+        self.position_embedding = fmten_model.position_embedding
+        self.lattice_embedding = fmten_model.lattice_embedding
+        encoder = fmten_model.encoder
         encoder.layers = encoder.layers[:6]
         self.encoder = encoder
     @staticmethod
@@ -140,11 +140,11 @@ class Experiment(pl.LightningModule):
         backbone.freeze()
         self.pretrain_freezed = backbone
         encode_layer = torch.nn.TransformerEncoderLayer(
-            d_model=256, nhead=heads, dim_feedforward=1024)
+            d_model=48, nhead=heads, dim_feedforward=192)
         self.encoder = torch.nn.TransformerEncoder(
             encode_layer, num_layers=layer)
         # self.re_init_parameters(self.encoder.layers[5])
-        self.readout = ff_output(input_dim=256, output_dim=100)
+        self.readout = ff_output(input_dim=48, output_dim=100)
 
     @staticmethod
     def re_init_parameters(layer):
@@ -340,11 +340,11 @@ def model_config(optim_type, optim_lr, optim_weight_decay,model_coord,model_laye
 
 
 if __name__ == "__main__":
-    prefix = "/home/jlx/v0.4.7/12.train_layer/"
+    prefix = "/home/jlx/v0.4.7/14.finetune_dim48/"
     trainer_config = "fit"
     checkpoint_path = None
     model_hpparams = model_config(
-        optim_type="AdamW", optim_lr=1e-4, optim_weight_decay=0,model_coord= 1.0, model_layer=2,model_heads=8,model_nonobj=0.4)
+        optim_type="AdamW", optim_lr=1e-4, optim_weight_decay=0,model_coord= 1.0, model_layer=6,model_heads=12,model_nonobj=0.4)
     # train_set_part = 1
     # epochs = 250*train_set_part
     epochs = 1500
