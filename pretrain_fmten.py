@@ -9,7 +9,7 @@ from cos_anneal.cosine_annearing_with_warmup import CosineAnnealingWarmupRestart
 
 
 def ff(input_dim):
-    return torch.nn.Sequential(torch.nn.Linear(input_dim, 48))
+    return torch.nn.Sequential(torch.nn.Linear(input_dim, 256))
 
 
 def ff_output(input_dim, output_dim):
@@ -24,18 +24,18 @@ class Experiment(pl.LightningModule):
         self.lr = lr
         self.atom_embedding = ff(459)
         self.atomic_number_embedding = torch.nn.Embedding(
-            num_embeddings=95, embedding_dim=48, padding_idx=0)
+            num_embeddings=95, embedding_dim=256, padding_idx=0)
         self.mendeleev_number_embedding = torch.nn.Embedding(
-            num_embeddings=104, embedding_dim=48, padding_idx=0)
+            num_embeddings=104, embedding_dim=256, padding_idx=0)
         self.space_group_number_embedding = torch.nn.Embedding(
-            num_embeddings=230, embedding_dim=48)
+            num_embeddings=230, embedding_dim=256)
         self.position_embedding = ff(240)
         self.lattice_embedding = ff(800)
         encode_layer = torch.nn.TransformerEncoderLayer(
-            d_model=48, nhead=8, dim_feedforward=192)
+            d_model=256, nhead=8, dim_feedforward=1024)
         self.encoder = torch.nn.TransformerEncoder(
             encode_layer, num_layers=12)
-        self.readout = ff_output(input_dim=48, output_dim=1)
+        self.readout = ff_output(input_dim=256, output_dim=1)
 
     @staticmethod
     def Gassian_expand(value_list, min_value, max_value, intervals, expand_width):

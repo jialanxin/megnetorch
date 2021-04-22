@@ -17,6 +17,7 @@ mendeleev_no = MoS2_graph.get_mendeleev_no
 valence_electron = MoS2_graph.get_valence_electrons
 space_group = MoS2_graph.get_space_group_number()
 cell_volume = MoS2_graph.get_cell_volume()
-raman_modes = MoS2_graph.get_raman_modes()
+# raman_modes = MoS2_graph.get_raman_modes()
+pos,itn = MoS2_graph.get_xrd()
 input = MoS2_graph.convert_to_model_input()
 print("end")

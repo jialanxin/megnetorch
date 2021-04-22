@@ -90,6 +90,15 @@ class StructureFmtEnDataset(Dataset):
     def __len__(self) -> int:
         return len(self.data_info)
 
+class StructureXRDDataset(StructureFmtEnDataset):
+    @staticmethod
+    def convert(item):
+        structure = Structure.from_dict(item["structure"])  
+        graph = CrystalEmbedding(structure,max_atoms=30)
+        encoded_graph = graph.convert_to_model_input()
+        xrd_postion, xrd_intensity = graph.get_xrd()
+        return encoded_graph,{"PS":xrd_postion,"IT":xrd_intensity}
+
 class StructureFmtEnStreamDataset(Dataset):
     def __init__(self,json_file_path:Path, post_check=True):
         if isinstance(json_file_path, Path):
@@ -179,7 +188,7 @@ class StructureRamanModesDataset(StructureFmtEnDataset):
 def prepare_datesets(json_file,pt_file):
     with open(json_file, "r") as f:
         data = json.load(f)
-    dataset = StructureRamanModesDataset.preprocess(data)
+    dataset = StructureXRDDataset.preprocess(data)
     print(len(dataset))
     torch.save(dataset, pt_file)
 
@@ -200,4 +209,4 @@ if __name__=="__main__":
     # prefix = "gdrive/MyDrive/Raman_machine_learning/OQMD/"
     # check_dataset(Path(prefix+"Valid_set.json"),prefix+"Valid_set_checked.json")
     # convert_fmten_set_to_spsp_set("materials/mp/Valid_fmten_set.pt","materials/mp/Valid_spgp_set.pt")
-    prepare_datesets("materials/OQMD/Train_set_checked.json","materials/OQMD/Train_raman_set.pt")
+    prepare_datesets("materials/OQMD/Valid_set_checked.json","materials/OQMD/Valid_xrd_set.pt")
