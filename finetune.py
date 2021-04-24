@@ -1,7 +1,9 @@
 from os import sync
 import torch
+from torch.functional import Tensor
 import torch.nn.functional as F
 import pytorch_lightning as pl
+from typing import Tuple,Dict
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
 from torch.utils.data import DataLoader
@@ -50,14 +52,14 @@ class Experiment(pl.LightningModule):
                 internal_layer._reset_parameters()
 
     @staticmethod
-    def Gassian_expand(value_list, min_value, max_value, intervals, expand_width):
+    def Gassian_expand(value_list, min_value:float, max_value:float, intervals:int, expand_width:float):
         value_list = value_list.expand(-1, -1, intervals)
         centers = torch.linspace(min_value, max_value,
                                  intervals).type_as(value_list)
         result = torch.exp(-(value_list - centers)**2/expand_width**2)
         return result
 
-    def shared_procedure(self, batch):
+    def shared_procedure(self, batch:Tuple[Dict[str,torch.Tensor],torch.Tensor]):
         encoded_graph, _ = batch
         # atoms: (batch_size,max_atoms,59)
         atoms = encoded_graph["atoms"]
@@ -81,13 +83,13 @@ class Experiment(pl.LightningModule):
        # (batch_size, max_atoms, 80)
         elecneg = self.Gassian_expand(elecneg, 0.5, 4.0, 80, 0.04)
         # (batch_size, max_atoms, 80)
-        covrad = self.Gassian_expand(covrad, 50, 250, 80, 2.5)
+        covrad = self.Gassian_expand(covrad, 50.0, 250.0, 80, 2.5)
         # (batch_size, max_atoms, 80)
-        FIE = self.Gassian_expand(FIE, 3, 25, 80, 0.28)
+        FIE = self.Gassian_expand(FIE, 3.0, 25.0, 80, 0.28)
         # (batch_size, max_atoms, 80)
-        elecaffi = self.Gassian_expand(elecaffi, -3, 3.7, 80, 0.08)
+        elecaffi = self.Gassian_expand(elecaffi, -3.0, 3.7, 80, 0.08)
         # (batch_size, max_atoms, 80)
-        atmwht = self.Gassian_expand(atmwht, 0, 210, 80, 2.63)
+        atmwht = self.Gassian_expand(atmwht, 0.0, 210.0, 80, 2.63)
         atoms = torch.cat(
             (atoms, elecneg, covrad, FIE, elecaffi, atmwht), dim=2)         # (batch_size, max_atoms, 459)
         atoms = self.atom_embedding(atoms)  # (batch_size,max_atoms,atoms_info)
@@ -113,13 +115,13 @@ class Experiment(pl.LightningModule):
 
         lattice = encoded_graph["lattice"]  # lattice: (batch_size, 9, 1)
         lattice = self.Gassian_expand(
-            lattice, -15, 18, 80, 0.41)  # (batch_size, 9, 80)
+            lattice, -15.0, 18.0, 80, 0.41)  # (batch_size, 9, 80)
         lattice = torch.flatten(lattice, start_dim=1)  # (batch_size,720)
 
         # lattice: (batch_size,1,1)
         cell_volume = torch.log(encoded_graph["CV"])
         cell_volume = self.Gassian_expand(
-            cell_volume, 3, 8, 80, 0.06)  # (batch_size,1,80)
+            cell_volume, 3.0, 8.0, 80, 0.06)  # (batch_size,1,80)
         cell_volume = torch.flatten(
             cell_volume, start_dim=1)  # (batch_size, 80)
 
@@ -138,7 +140,7 @@ class Experiment(pl.LightningModule):
         # (1+max_atoms, batch_size, atoms_info)
         atoms = torch.transpose(atoms, dim0=0, dim1=1)
         batch_size = padding_mask.shape[0]
-        cls_padding = torch.zeros((batch_size, 1)).bool().type_as(
+        cls_padding = torch.zeros((batch_size, 1)).to(torch.bool).type_as(
             padding_mask)  # (batch_size, 1)
 
         # (batch_size, 1+max_atoms)

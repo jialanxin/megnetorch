@@ -1,10 +1,10 @@
 import json
-from typing import overload
 
 import numpy as np
 import plotly.graph_objects as go
 import streamlit as st
 import torch
+from typing import Dict,Tuple
 from plotly.subplots import make_subplots
 from torch.utils.data import DataLoader
 
@@ -27,7 +27,7 @@ class Experiment(Finetune):
         self.encoder = pretrain_model.encoder
         self.readout = pretrain_model.readout
 
-    def forward(self, batch):
+    def forward(self, batch:Tuple[Dict[str,torch.Tensor],torch.Tensor]):
         predicted_spectrum = self.shared_procedure(batch)
         return predicted_spectrum
 
@@ -36,6 +36,7 @@ def load_dataset(Train_or_Valid="Valid"):
     with open(f"materials/JVASP/{Train_or_Valid}_unique_mp_id.json", "r") as f:
         data = json.loads(f.read())
     dataset = RamanFormularDataset(data)
+    print(len(dataset))
     return dataset
 
 
@@ -61,7 +62,7 @@ class RamanFormularDataset(StructureRamanDataset):
         return couples
 
 
-def NMS_or_not(predicted, nms=False, cut_off=0.5):
+def NMS_or_not(predicted, nms:bool=False, cut_off:float=0.5):
     predicted = predicted[0]
     predicted_confidence = predicted[:, :, 0]  # (25,2)
     predicted_position = predicted[:, :, 1]   # (25,2)
@@ -89,12 +90,12 @@ def count_incorrects(ramans, predict_confidence_round):
     less = torch.less(predict_confidence_round,target_confidence).float().sum().detach().item()
     incorrect = more+less
     total = target_confidence.float().sum().detach().item()
-    return more,less,incorrect,total, target_confidence, target_position
+    return int(more),int(less),int(incorrect),int(total), target_confidence, target_position
 
 
 def absolute_position(relative_postition):
-    edge = torch.FloatTensor([100, 110,  120, 131,  143,  155,  167,  180,  194,  209,  226,  241,
-                              259,  277,  297,  322,  347,  375,  406,  440,  478,  528,  587,  685,  844, 1100])
+    edge = torch.tensor([100, 110,  120, 131,  143,  155,  167,  180,  194,  209,  226,  241,
+                              259,  277,  297,  322,  347,  375,  406,  440,  478,  528,  587,  685,  844, 1100]).to(torch.float32)
     left = edge[:-1]
     right = edge[1:]
     edge_range = right-left
@@ -110,64 +111,81 @@ def save_loss_formula(Train_or_Valid="Valid"):
     dataset = load_dataset(Train_or_Valid)
     dataloader = DataLoader(dataset=dataset, batch_size=1)
     model = Experiment()
-    formula_list = []
-    more_list = []
-    less_list = []
-    incorrect_list = []
-    total_list = []
-    target_confidence_list = []
-    target_position_list = []
-    predicted_confidence_list = []
-    predicted_position_list = []
-    mp_id_list = []
+    props = []
     for i, data in enumerate(dataloader):
         graph, ramans, formula, mp_id = data
+        spacegroup = graph["SGN"].item()
         input = (graph, ramans)
         predicted_spectrum = model(input)
         predicted_confidence, predicted_position, predicted_confidence_round = NMS_or_not(
             predicted_spectrum)
         more,less,incorrect,total, target_confidence, target_position = count_incorrects(
             ramans, predicted_confidence_round)
-        formula_list.append(formula[0])
-        more_list.append(more)
-        less_list.append(less)
-        total_list.append(total)
-        incorrect_list.append(incorrect)
-        target_confidence_list.append(target_confidence)
-        target_position_list.append(target_position)
-        predicted_confidence_list.append(predicted_confidence)
-        predicted_position_list.append(predicted_position)
-        mp_id_list.append(mp_id)
-    torch.save({"formula": formula_list, "more":more_list,"less":less_list,"incorrect":incorrect_list,"total":total_list, "target_confidence": target_confidence_list, "target_position": target_position_list,
-                "predicted_confidence": predicted_confidence_list, "predicted_position": predicted_position_list, "mp_id": mp_id_list}, f"materials/JVASP/{Train_or_Valid}_loss_formula_yolo.pt")
-
-
-def load_loss_formula(Train_or_Valid="Valid"):
-    data = torch.load(f"materials/JVASP/{Train_or_Valid}_loss_formula_yolo.pt")
-    return  data["formula"], data["more"],data["less"],data["incorrect"],data["total"], data["target_confidence"], data["target_position"], data["predicted_confidence"],data["predicted_position"],data["mp_id"]
+        prop = {"FML":formula[0],"MR":more,"LS":less,"TTL":total,"ICT":incorrect,"TGT_CF":target_confidence,"TGT_PS":target_position,"PDT_CF":predicted_confidence,"PDT_PS":predicted_position,"MP":mp_id[0],"SG":spacegroup}
+        props.append(prop)
+    torch.save(props, f"materials/JVASP/{Train_or_Valid}_loss_formula_yolo.pt")
 
 
 def plot_points(Train_or_Valid="Valid"):
-    formula,more,less,incorrect,total, _, _,_,_,_ = load_loss_formula(Train_or_Valid)
-    fig = make_subplots(rows=3,cols=2,subplot_titles=("Number of modes more than target","Number of modes less than target","more hist","less hist","incorrect hist","incorrect-total"))
+    data = torch.load(f"materials/JVASP/{Train_or_Valid}_loss_formula_yolo.pt")
+    formula = []
+    more = []
+    less = []
+    incorrect = []
+    for item in data:
+        formula.append(item["FML"])
+        more.append(item["MR"])
+        less.append(item["LS"])
+        incorrect.append(item["ICT"])
+    fig = make_subplots(rows=3,cols=2,subplot_titles=("Number of modes more than target","Number of modes less than target","more hist","less hist","incorrect hist"))
     fig.add_trace(go.Scatter(x=formula, y=more, mode="markers",
                              marker=dict(size=5 if Train_or_Valid == "Valid" else 2)),col=1,row=1)
-    count, value = np.histogram(more,bins=12)
+    count, value = np.histogram(more,bins=14)
     fig.add_trace(go.Scatter(x=value,y=count),col=1,row=2)
 
     fig.add_trace(go.Scatter(x=formula, y=less, mode="markers",
                              marker=dict(size=5 if Train_or_Valid == "Valid" else 2)),col=2,row=1)
-    count, value = np.histogram(less,bins=10)
+    count, value = np.histogram(less,bins=13)
     fig.add_trace(go.Scatter(x=value,y=count),col=2,row=2)
-    count,value = np.histogram(incorrect,bins=15)
+    count,value = np.histogram(incorrect,bins=16)
     fig.add_trace(go.Scatter(x=value,y=count),col=1,row=3)
-    total = np.array(total)
-    incorrect= np.array(incorrect)
-    shape = total.shape[0]
-    total = total+np.random.rand(shape)*0.5-0.25
-    incorrect = incorrect+np.random.rand(shape)*0.5-0.25
-    fig.add_trace(go.Scatter(x=total+np.random.rand(),y=incorrect,mode="markers"),col=2,row=3)
     fig.update_layout(showlegend=False)
+    return fig
+
+def plot_incorrect_dist(Train_or_Valid="Valid",spacegroup_or_total="SG"):
+    data = torch.load(f"materials/JVASP/{Train_or_Valid}_loss_formula_yolo.pt")
+    if spacegroup_or_total == "TTL":
+        total = np.linspace(0,25,26)
+        x = total
+    else:
+        space_groups = np.linspace(1,230,230)
+        x = space_groups
+    
+    incorrect_0 = np.zeros_like(x)
+    incorrect_1 = np.zeros_like(x)
+    incorrect_2 = np.zeros_like(x)
+    incorrect_3 = np.zeros_like(x)
+    incorrect_4 = np.zeros_like(x)
+    incorrect_more = np.zeros_like(x)
+    for item in data:
+        if spacegroup_or_total == "TTL":
+            key = item["TTL"]
+        else:
+            key = item["SG"]-1
+        if item["ICT"] == 0:
+            incorrect_0[key] += 1
+        elif item["ICT"] == 1:
+            incorrect_1[key] += 1
+        elif item["ICT"] == 2:
+            incorrect_2[key] += 1
+        elif item["ICT"] == 3:
+            incorrect_3[key] += 1
+        elif item["ICT"] == 4:
+            incorrect_4[key] += 1
+        else:
+            incorrect_more[item[spacegroup_or_total]-1] += 1
+    fig = go.Figure(data=[go.Bar(x=x,y=incorrect_0,name="incorrect=0"),go.Bar(x=x,y=incorrect_1,name="incorrect=1"),go.Bar(x=x,y=incorrect_2,name="incorrect=2"),go.Bar(x=x,y=incorrect_3,name="incorrect=3"),go.Bar(x=x,y=incorrect_4,name="incorrect=4"),go.Bar(x=x,y=incorrect_more,name="incorrect>=5")])
+    fig.update_layout(barmode='stack')
     return fig
 
 
@@ -181,16 +199,17 @@ def process_y(x, confidence, position,cut_off=0.5):
     return y.detach().numpy()
 
 
-def search_formula(formula, Train_or_Valid="Valid", cut_off=0.5):
-    formula_list, more,less,_,_,target_confidence,target_position, predict_confidence,predict_position,mp_id = load_loss_formula(Train_or_Valid)
-    index = formula_list.index(formula)
-    target_confidence = target_confidence[index]
-    target_position = target_position[index]
-    predict_confidence = predict_confidence[index]
-    predict_position = predict_position[index]
-    more = more[index]
-    less = less[index]
-    mp_id = mp_id[index][0]
+def search_formula(formula, cut_off=0.5):
+    data = torch.load(f"materials/JVASP/Valid_loss_formula_yolo.pt")
+    for item in data:
+        if formula == item["FML"]:
+            target_confidence = item["TGT_CF"]
+            target_position = item["TGT_PS"]
+            predict_confidence = item["PDT_CF"]
+            predict_position = item["PDT_PS"]
+            more = item["MR"]
+            less = item["LS"]
+            mp_id = item["MP"]
     fig = go.Figure()
     x = torch.linspace(100, 1100, 10000)
     raman = process_y(x, target_confidence, target_position)
@@ -204,11 +223,16 @@ if __name__ == "__main__":
     # save_loss_formula("Train")
     # save_loss_formula("Valid")
     st.header("Incorrectness of Validation Set")
-    fig_valid = plot_points("Valid")
-    st.write(fig_valid)
+    st.write(plot_points("Valid"))
+    st.subheader("incorrect-total modes")
+    st.write(plot_incorrect_dist("Valid","TTL"))
+    st.subheader("incorrect-space group")
+    st.write(plot_incorrect_dist("Valid","SG"))
+    st.subheader("incorrect-space group (training set)")
+    st.write(plot_incorrect_dist("Train","SG"))
     formula_valid = st.text_input("Insert a formula", "Ta4 Si2")
     cut_off_valid = st.slider("ignore confidence under cutoff", min_value=0.0, max_value=1.0, value=0.5, key="Valid")
-    fig_valid_search,more_valid,less_valid,mp_id_valid = search_formula(formula_valid, "Valid",cut_off_valid)
+    fig_valid_search,more_valid,less_valid,mp_id_valid = search_formula(formula_valid,cut_off_valid)
     st.write(fig_valid_search)
     st.write(f"more:{more_valid}, less:{less_valid}")
     st.write(f"mp_link: https://www.materialsproject.org/materials/mp-{mp_id_valid}")
