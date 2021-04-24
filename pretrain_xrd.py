@@ -35,9 +35,10 @@ class Experiment(pl.LightningModule):
         self.readout = ff_output(input_dim=256, output_dim=50)
 
     @staticmethod
-    def Gassian_expand(value_list, min_value, max_value, intervals, expand_width, device):
+    def Gassian_expand(value_list, min_value, max_value, intervals, expand_width):
         value_list = value_list.expand(-1, -1, intervals)
-        centers = torch.linspace(min_value, max_value, intervals).to(device)
+        centers = torch.linspace(min_value, max_value,
+                                 intervals).type_as(value_list)
         result = torch.exp(-(value_list - centers)**2/expand_width**2)
         return result
 
@@ -60,24 +61,22 @@ class Experiment(pl.LightningModule):
         # (batch_size, max_atoms, 3)
         positions = encoded_graph["positions"]
 
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
        # (batch_size, max_atoms, 80)
-        elecneg = self.Gassian_expand(elecneg, 0.5, 4.0, 80, 0.04, device)
+        elecneg = self.Gassian_expand(elecneg, 0.5, 4.0, 80, 0.04)
         # (batch_size, max_atoms, 80)
-        covrad = self.Gassian_expand(covrad, 50, 250, 80, 2.5, device)
+        covrad = self.Gassian_expand(covrad, 50, 250, 80, 2.5)
         # (batch_size, max_atoms, 80)
-        FIE = self.Gassian_expand(FIE, 3, 25, 80, 0.28, device)
+        FIE = self.Gassian_expand(FIE, 3, 25, 80, 0.28)
         # (batch_size, max_atoms, 80)
-        elecaffi = self.Gassian_expand(elecaffi, -3, 3.7, 80, 0.08, device)
+        elecaffi = self.Gassian_expand(elecaffi, -3, 3.7, 80, 0.08)
         # (batch_size, max_atoms, 80)
-        atmwht = self.Gassian_expand(atmwht, 0, 210, 80, 2.63, device)
+        atmwht = self.Gassian_expand(atmwht, 0, 210, 80, 2.63)
         atoms = torch.cat(
             (atoms, elecneg, covrad, FIE, elecaffi, atmwht), dim=2)         # (batch_size, max_atoms, 459)
         atoms = self.atom_embedding(atoms)  # (batch_size,max_atoms,atoms_info)
 
         positions = positions.unsqueeze(dim=3).expand(-1, -1, 3, 80)
-        centers = torch.linspace(-15, 18, 80).to(device)
+        centers = torch.linspace(-15, 18, 80).type_as(positions)
         # (batch_size, max_atoms, 3, 80)
         positions = torch.exp(-(positions - centers)**2/0.41**2)
         # (batch_size, max_atoms, 240)
@@ -97,13 +96,13 @@ class Experiment(pl.LightningModule):
 
         lattice = encoded_graph["lattice"]  # lattice: (batch_size, 9, 1)
         lattice = self.Gassian_expand(
-            lattice, -15, 18, 80, 0.41, device)  # (batch_size, 9, 80)
+            lattice, -15, 18, 80, 0.41)  # (batch_size, 9, 80)
         lattice = torch.flatten(lattice, start_dim=1)  # (batch_size,720)
 
         # lattice: (batch_size,1,1)
         cell_volume = torch.log(encoded_graph["CV"])
         cell_volume = self.Gassian_expand(
-            cell_volume, 3, 8, 80, 0.06, device)  # (batch_size,1,80)
+            cell_volume, 3, 8, 80, 0.06)  # (batch_size,1,80)
         cell_volume = torch.flatten(
             cell_volume, start_dim=1)  # (batch_size, 80)
 
@@ -122,8 +121,8 @@ class Experiment(pl.LightningModule):
         # (1+max_atoms, batch_size, atoms_info)
         atoms = torch.transpose(atoms, dim0=0, dim1=1)
         batch_size = padding_mask.shape[0]
-        cls_padding = torch.zeros((batch_size, 1)).bool().to(
-            device)  # (batch_size, 1)
+        cls_padding = torch.zeros((batch_size, 1)).bool().type_as(
+            padding_mask)  # (batch_size, 1)
 
         # (batch_size, 1+max_atoms)
         padding_mask = torch.cat((cls_padding, padding_mask), dim=1)
@@ -170,8 +169,8 @@ class Experiment(pl.LightningModule):
 
     def yolov1_loss(self, raman, predict):
         # predict (batch_size, wavelength_clips, 2)
-        xrd_position = raman["PS"]  # (batch_size, wavelength_clips)
-        xrd_intensity = raman["IT"]  # (batch_size, wavelength_clips)
+        xrd_position = raman["PS"].float()  # (batch_size, wavelength_clips)
+        xrd_intensity = raman["IT"].float()  # (batch_size, wavelength_clips)
         predict_intensity = predict[:, :, 0]  # (batch_size, wavelength_clips)
         predict_position = predict[:, :, 1]  # (batch_size, wavelength_clips)
         nonobject_mask = torch.eq(xrd_intensity, torch.zeros_like(
@@ -204,7 +203,7 @@ class Experiment(pl.LightningModule):
 
     def loss_scores(self, ramans, predicted_spectrum):
         # predict (batch_size, wavelength_clips, 2)
-        xrd_intensity = ramans["IT"]  # (batch_size, wavelength_clips)
+        xrd_intensity = ramans["IT"].float()  # (batch_size, wavelength_clips)
         xrd_intensity = torch.sign(xrd_intensity)
         # (batch_size, wavelength_clips)
         predicted_intensity = predicted_spectrum[:, :, 0]
@@ -273,16 +272,17 @@ def model_config(optim_type, optim_lr, optim_weight_decay, model_nonboj, model_c
 if __name__ == "__main__":
     prefix = "/home/jlx/v0.4.8/1.pretrain_xrd/"
     trainer_config = "fit"
-    checkpoint_path = None
+    checkpoint_path = "/home/jlx/v0.4.8/1.pretrain_xrd/default/version_1/checkpoints/epoch=19-step=22075.ckpt"
     model_hpparams = model_config(
-        optim_type="AdamW", optim_lr=1e-4, model_nonboj=0.4, model_coord=2)
+        optim_type="AdamW", optim_lr=1e-4, optim_weight_decay=0.0, model_nonboj=0.4, model_coord=2.0)
     # train_set_part = 1
     # epochs = 250*train_set_part
     epochs = 1000
     batch_size = 512
+    gpus = 1 if torch.cuda.is_available() else 0
 
     checkpoint_callback = ModelCheckpoint(
-        monitor='val_loss_yolo',
+        monitor='val_yolo',
         save_top_k=3,
         mode='min',
     )
@@ -295,7 +295,7 @@ if __name__ == "__main__":
     validate_dataloader = DataLoader(
         dataset=validate_set, batch_size=batch_size, num_workers=4)
 
-    experiment = Experiment(**model_hpparams)
+    experiment = Experiment.load_from_checkpoint(checkpoint_path)
 
     logger = TensorBoardLogger(prefix)
     if trainer_config == "tune":
@@ -304,9 +304,9 @@ if __name__ == "__main__":
         trainer.tune(experiment, train_dataloader, validate_dataloader)
     else:
         if checkpoint_path != None:
-            trainer = pl.Trainer(resume_from_checkpoint=checkpoint_path, gpus=1 if torch.cuda.is_available(
-            ) else 0, logger=logger, callbacks=[checkpoint_callback], max_epochs=epochs)
+            trainer = pl.Trainer(resume_from_checkpoint=checkpoint_path, gpus=gpus, logger=logger, precision=16, callbacks=[
+                                 checkpoint_callback], max_epochs=epochs)
         else:
-            trainer = pl.Trainer(gpus=1 if torch.cuda.is_available() else 0, logger=logger,
+            trainer = pl.Trainer(gpus=gpus, logger=logger, precision=16,
                                  callbacks=[checkpoint_callback],  max_epochs=epochs)
         trainer.fit(experiment, train_dataloader, validate_dataloader)

@@ -78,6 +78,8 @@ class CrystalBase:
                     intensity_emb[j] = y_i
                     position_emb[j] = (x_i-l)/3.6
         intensity_emb = intensity_emb/100
+        position_emb = position_emb.astype(np.float32)
+        intensity_emb = intensity_emb.astype(np.float32)
         return position_emb,intensity_emb
 
 
