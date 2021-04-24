@@ -1,8 +1,8 @@
 from pymatgen import Structure
 from typing import Dict, List, Tuple
-from pymatgen import MPRester
 from pymatgen.optimization.neighbors import find_points_in_spheres
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
+from pymatgen.analysis.diffraction.xrd import XRDCalculator
 import numpy as np
 from pandas import DataFrame
 import torch
@@ -62,6 +62,25 @@ class CrystalBase:
                     if modes_with_wyckoff[wp] != 0:
                         all_modes[i] = 1
         return all_modes
+    
+    def get_xrd(self):
+        xrd_calc = XRDCalculator()
+        xrd_pattern = xrd_calc.get_pattern(self.structure)
+        theta = xrd_pattern.x
+        intensity = xrd_pattern.y
+        edge = np.linspace(0,90,26)
+        left = edge[:-1]
+        position_emb = np.zeros_like(left)
+        intensity_emb = np.zeros_like(left)
+        for x_i,y_i in zip(theta,intensity):
+            for j,(l,h) in enumerate(zip(left,intensity_emb)):
+                if x_i >= l and x_i <l+3.6 and y_i>=10 and y_i >=h:
+                    intensity_emb[j] = y_i
+                    position_emb[j] = (x_i-l)/3.6
+        intensity_emb = intensity_emb/100
+        position_emb = position_emb.astype(np.float32)
+        intensity_emb = intensity_emb.astype(np.float32)
+        return position_emb,intensity_emb
 
 
 class CrystalGraph(CrystalBase):
