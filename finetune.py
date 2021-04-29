@@ -1,4 +1,3 @@
-from os import sync
 import torch
 import torch.nn.functional as F
 import pytorch_lightning as pl
@@ -7,7 +6,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from torch.utils.data import DataLoader
 from dataset import StructureRamanDataset
 from pretrain_fmten import Experiment as FmtEn
-from pretrain_spgp import Experiment as SPGP
+from pretrain_xrd import Experiment as XRD
 from cos_anneal.cosine_annearing_with_warmup import CosineAnnealingWarmupRestarts
 
 
@@ -23,17 +22,17 @@ class Backbone(pl.LightningModule):
     def __init__(self):
         super().__init__()
         fmten_model = FmtEn.load_from_checkpoint(
-            "pretrain/fmten/epoch=596-step=672221.ckpt")
-        # spgp_model = SPGP.load_from_checkpoint(
-            # "pretrain/spacegroup/epoch=774-step=872649.ckpt")
+            "pretrain/fmten/epoch=585-step=659835.ckpt")
+        xrd_model = XRD.load_from_checkpoint(
+            "pretrain/xrd/epoch=998-step=1124429.ckpt")
         self.atom_embedding = fmten_model.atom_embedding
         self.atomic_number_embedding = fmten_model.atomic_number_embedding
-        self.space_group_number_embedding = fmten_model.space_group_number_embedding
+        self.space_group_number_embedding = xrd_model.space_group_number_embedding
         self.mendeleev_number_embedding = fmten_model.mendeleev_number_embedding
-        self.position_embedding = fmten_model.position_embedding
-        self.lattice_embedding = fmten_model.lattice_embedding
-        encoder = fmten_model.encoder
-        encoder.layers = encoder.layers[:6]
+        self.position_embedding = xrd_model.position_embedding
+        self.lattice_embedding = xrd_model.lattice_embedding
+        encoder = xrd_model.encoder
+        # encoder.layers = encoder.layers[:6]
         self.encoder = encoder
     @staticmethod
     def Gassian_expand(value_list, min_value, max_value, intervals, expand_width):
@@ -137,14 +136,14 @@ class Experiment(pl.LightningModule):
         self.save_hyperparameters()
         self.lr = lr
         backbone = Backbone()
-        backbone.freeze()
+        # backbone.freeze()
         self.pretrain_freezed = backbone
-        encode_layer = torch.nn.TransformerEncoderLayer(
-            d_model=48, nhead=heads, dim_feedforward=192)
-        self.encoder = torch.nn.TransformerEncoder(
-            encode_layer, num_layers=layer)
+        # encode_layer = torch.nn.TransformerEncoderLayer(
+            # d_model=48, nhead=heads, dim_feedforward=192)
+        # self.encoder = torch.nn.TransformerEncoder(
+            # encode_layer, num_layers=layer)
         # self.re_init_parameters(self.encoder.layers[5])
-        self.readout = ff_output(input_dim=48, output_dim=100)
+        self.readout = ff_output(input_dim=256, output_dim=100)
 
     @staticmethod
     def re_init_parameters(layer):
@@ -162,7 +161,7 @@ class Experiment(pl.LightningModule):
         atoms, padding_mask = self.pretrain_freezed(batch)
 
         # (1+max_atoms, batch_size, atoms_info)
-        atoms = self.encoder(src=atoms, src_key_padding_mask=padding_mask)
+        # atoms = self.encoder(src=atoms, src_key_padding_mask=padding_mask)
 
         system_out = atoms[0]  # (batch_size,atoms_info)
 
@@ -340,14 +339,14 @@ def model_config(optim_type, optim_lr, optim_weight_decay,model_coord,model_laye
 
 
 if __name__ == "__main__":
-    prefix = "/home/jlx/v0.4.7/14.finetune_dim48/"
+    prefix = "/home/jlx/v0.4.8/2.finetune_after_xrd_early_stop_200/"
     trainer_config = "fit"
     checkpoint_path = None
     model_hpparams = model_config(
-        optim_type="AdamW", optim_lr=1e-4, optim_weight_decay=0,model_coord= 1.0, model_layer=6,model_heads=12,model_nonobj=0.4)
+        optim_type="AdamW", optim_lr=1e-4, optim_weight_decay=1e-2,model_coord= 2.0, model_layer=6,model_heads=12,model_nonobj=0.4)
     # train_set_part = 1
     # epochs = 250*train_set_part
-    epochs = 1500
+    epochs = 200
     batch_size = 128
 
     checkpoint_callback = ModelCheckpoint(
