@@ -54,6 +54,45 @@ class StructureRamanDataset(Dataset):
     def __len__(self) -> int:
         return len(self.data_info)
 
+class StrainStructureRamanDataset(Dataset):
+    @staticmethod
+    def get_input(data,strain=None):
+        couples = []
+        for item in data:
+            structure = Structure.from_dict(item)
+            if strain:
+                structure.apply_strain(strain)
+            try:
+                raman = torch.FloatTensor(item["raman"])
+                graph = CrystalEmbedding(structure,max_atoms=30)
+            except ValueError:
+                continue
+            except RuntimeError:
+                continue
+            except TypeError:
+                continue
+            encoded_graph = graph.convert_to_model_input()
+            couples.append((encoded_graph,raman))
+        return couples
+    @classmethod
+    def construct(cls,data,strain=None):
+        couples = cls.get_input(data,strain)
+        return cls(couples)
+    @classmethod
+    def joinsubdatasets(cls,dataset_list):
+        empty_data_info = []
+        for dataset in dataset_list:
+            data_info = dataset.data_info
+            empty_data_info.extend(data_info)
+        return cls(empty_data_info)
+    def __init__(self,data) -> None:
+        super().__init__()
+        self.data_info = data
+    def __getitem__(self, index: str):
+        return self.data_info[index]
+    def __len__(self) -> int:
+        return len(self.data_info)
+
 class StructureFmtEnDataset(Dataset):
     @staticmethod
     def convert(item):
@@ -188,7 +227,7 @@ class StructureRamanModesDataset(StructureFmtEnDataset):
 def prepare_datesets(json_file,pt_file):
     with open(json_file, "r") as f:
         data = json.load(f)
-    dataset = StructureXRDDataset.preprocess(data)
+    dataset = StrainStructureRamanDataset.construct(data,strain=-0.1)
     print(len(dataset))
     torch.save(dataset, pt_file)
 
@@ -205,8 +244,17 @@ def check_dataset(in_path:Path,out_path:str):
     with open(out_path,"w") as f:
         json.dump(data_postcheck,f)
 
+def joinstains(pathlist,savepath):
+    dataset_list = []
+    for path in pathlist:
+        dataset = torch.load(path)
+        dataset_list.append(dataset)
+    new_set = StrainStructureRamanDataset.joinsubdatasets(dataset_list)
+    torch.save(new_set,savepath)
+
 if __name__=="__main__":
     # prefix = "gdrive/MyDrive/Raman_machine_learning/OQMD/"
     # check_dataset(Path(prefix+"Valid_set.json"),prefix+"Valid_set_checked.json")
     # convert_fmten_set_to_spsp_set("materials/mp/Valid_fmten_set.pt","materials/mp/Valid_spgp_set.pt")
-    prepare_datesets("materials/OQMD/Valid_set_checked.json","materials/OQMD/Valid_xrd_set.pt")
+    # prepare_datesets("materials/JVASP/Train_unique_mp_id.json","materials/JVASP/Train_raman_set_strain_neg0.1.pt")
+    joinstains(["materials/JVASP/Train_raman_set_strain_neg0.1.pt","materials/JVASP/Train_raman_set_strain_neg0.05.pt","materials/JVASP/Train_raman_set_strain_0.pt"],"materials/JVASP/Train_raman_set_strain_neg0.1_to_0.pt")

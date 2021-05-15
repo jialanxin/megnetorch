@@ -4,7 +4,7 @@ import pytorch_lightning as pl
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
 from torch.utils.data import DataLoader
-from dataset import StructureRamanDataset
+from dataset import StructureRamanDataset, StrainStructureRamanDataset
 from pretrain_fmten import Experiment as FmtEn
 from pretrain_xrd import Experiment as XRD
 from cos_anneal.cosine_annearing_with_warmup import CosineAnnealingWarmupRestarts
@@ -17,6 +17,7 @@ def ff(input_dim):
 def ff_output(input_dim, output_dim):
     # , torch.nn.RReLU(), Dropout(0.3), torch.nn.Linear(128, 128), torch.nn.RReLU(), Dropout(0.3), torch.nn.Linear(128, output_dim))
     return torch.nn.Sequential(torch.nn.Linear(input_dim, output_dim))
+
 
 class Backbone(pl.LightningModule):
     def __init__(self):
@@ -34,6 +35,7 @@ class Backbone(pl.LightningModule):
         encoder = xrd_model.encoder
         # encoder.layers = encoder.layers[:6]
         self.encoder = encoder
+
     @staticmethod
     def Gassian_expand(value_list, min_value, max_value, intervals, expand_width):
         value_list = value_list.expand(-1, -1, intervals)
@@ -41,6 +43,7 @@ class Backbone(pl.LightningModule):
                                  intervals).type_as(value_list)
         result = torch.exp(-(value_list - centers)**2/expand_width**2)
         return result
+
     def forward(self, batch):
         encoded_graph, _ = batch
         # atoms: (batch_size,max_atoms,59)
@@ -130,8 +133,9 @@ class Backbone(pl.LightningModule):
         atoms = self.encoder(src=atoms, src_key_padding_mask=padding_mask)
         return atoms, padding_mask
 
+
 class Experiment(pl.LightningModule):
-    def __init__(self, optim_type="Adam", lr=1e-3, weight_decay=0.0, coord = 3.0 ,nonobj=0.2, layer=12, heads=8):
+    def __init__(self, optim_type="Adam", lr=1e-3, weight_decay=0.0, coord=3.0, nonobj=0.2, layer=12, heads=8):
         super().__init__()
         self.save_hyperparameters()
         self.lr = lr
@@ -139,9 +143,9 @@ class Experiment(pl.LightningModule):
         # backbone.freeze()
         self.pretrain_freezed = backbone
         # encode_layer = torch.nn.TransformerEncoderLayer(
-            # d_model=48, nhead=heads, dim_feedforward=192)
+        # d_model=48, nhead=heads, dim_feedforward=192)
         # self.encoder = torch.nn.TransformerEncoder(
-            # encode_layer, num_layers=layer)
+        # encode_layer, num_layers=layer)
         # self.re_init_parameters(self.encoder.layers[5])
         self.readout = ff_output(input_dim=256, output_dim=100)
 
@@ -154,8 +158,6 @@ class Experiment(pl.LightningModule):
             elif hasattr(internal_layer, "_reset_parameters"):
                 print(f"Reset parameters of {internal_layer}")
                 internal_layer._reset_parameters()
-
-
 
     def shared_procedure(self, batch):
         atoms, padding_mask = self.pretrain_freezed(batch)
@@ -325,7 +327,7 @@ class Experiment(pl.LightningModule):
         return [optimizer], [schedualer]
 
 
-def model_config(optim_type, optim_lr, optim_weight_decay,model_coord,model_layer,model_heads,model_nonobj):
+def model_config(optim_type, optim_lr, optim_weight_decay, model_coord, model_layer, model_heads, model_nonobj):
     params = {}
     if optim_type == "AdamW":
         params["optim_type"] = "AdamW"
@@ -339,14 +341,14 @@ def model_config(optim_type, optim_lr, optim_weight_decay,model_coord,model_laye
 
 
 if __name__ == "__main__":
-    prefix = "/home/jlx/v0.4.8/2.finetune_after_xrd_early_stop_200/"
+    prefix = "/home/jlx/v0.4.8/3.finetune_augmentation_strain_neg0.1_to_0/"
     trainer_config = "fit"
     checkpoint_path = None
     model_hpparams = model_config(
-        optim_type="AdamW", optim_lr=1e-4, optim_weight_decay=1e-2,model_coord= 2.0, model_layer=6,model_heads=12,model_nonobj=0.4)
+        optim_type="AdamW", optim_lr=1e-4, optim_weight_decay=1e-2, model_coord=2.0, model_layer=6, model_heads=8, model_nonobj=0.4)
     # train_set_part = 1
     # epochs = 250*train_set_part
-    epochs = 200
+    epochs = 2000
     batch_size = 128
 
     checkpoint_callback = ModelCheckpoint(
@@ -355,7 +357,8 @@ if __name__ == "__main__":
         mode='min',
     )
 
-    train_set = torch.load("materials/JVASP/Train_raman_set_25_uneq_yolov1.pt")
+    train_set = torch.load(
+        "materials/JVASP/Train_raman_set_strain_neg0.1_to_0.pt")
     validate_set = torch.load(
         "materials/JVASP/Valid_raman_set_25_uneq_yolov1.pt")
     train_dataloader = DataLoader(

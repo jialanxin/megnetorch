@@ -3,6 +3,7 @@ from pymatgen.core.structure import Structure
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
 MoS2_structure = Structure.from_file("materials/MoS2_mp-2815_conventional_standard.cif")
+MoS2_structure.make_supercell(2)
 MoS2_graph = CrystalEmbedding(MoS2_structure)
 atomic_periods = MoS2_graph.get_atomic_periods
 atomic_groups = MoS2_graph.get_atomic_groups
