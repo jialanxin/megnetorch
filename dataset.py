@@ -93,6 +93,31 @@ class StrainStructureRamanDataset(Dataset):
     def __len__(self) -> int:
         return len(self.data_info)
 
+class SuperCellRamanDataset(StrainStructureRamanDataset):
+    @classmethod
+    def get_input(data):
+        couples = []
+        for item in data:
+            structure = Structure.from_dict(item)
+            structure.make_supercell(2)
+            try:
+                raman = torch.FloatTensor(item["raman"])
+                graph = CrystalEmbedding(structure,max_atoms=240)
+            except ValueError:
+                continue
+            except RuntimeError:
+                continue
+            except TypeError:
+                continue
+            encoded_graph = graph.convert_to_model_input()
+            couples.append((encoded_graph,raman))
+        return couples
+    @classmethod
+    def construct(cls, data):
+        couples = cls.get_input(data)
+        return cls(couples)
+
+
 class StructureFmtEnDataset(Dataset):
     @staticmethod
     def convert(item):
@@ -121,6 +146,12 @@ class StructureFmtEnDataset(Dataset):
         else:
             data_info = cls.get_input(data)
         return cls(data_info)
+    @classmethod
+    def joinsubsets(cls,subsets):
+        data = []
+        for subset in subsets:
+            data.extend(subset.data_info)
+        return cls(data)
     def __init__(self,converted_data):
         super().__init__()
         self.data_info = converted_data
@@ -128,6 +159,16 @@ class StructureFmtEnDataset(Dataset):
         return self.data_info[index]
     def __len__(self) -> int:
         return len(self.data_info)
+
+class SuperCellFmtEnDataset(StructureFmtEnDataset):
+    @staticmethod
+    def convert(item):
+        structure = Structure.from_dict(item["structure"])
+        structure.make_supercell([1,2,1])
+        fmt_en = torch.FloatTensor([item["formation_energy_per_atom"]])
+        graph = CrystalEmbedding(structure,max_atoms=60)
+        encoded_graph = graph.convert_to_model_input()
+        return encoded_graph, fmt_en
 
 class StructureXRDDataset(StructureFmtEnDataset):
     @staticmethod
@@ -227,7 +268,7 @@ class StructureRamanModesDataset(StructureFmtEnDataset):
 def prepare_datesets(json_file,pt_file):
     with open(json_file, "r") as f:
         data = json.load(f)
-    dataset = StrainStructureRamanDataset.construct(data,strain=-0.1)
+    dataset = SuperCellFmtEnDataset.preprocess(data)
     print(len(dataset))
     torch.save(dataset, pt_file)
 
@@ -249,12 +290,12 @@ def joinstains(pathlist,savepath):
     for path in pathlist:
         dataset = torch.load(path)
         dataset_list.append(dataset)
-    new_set = StrainStructureRamanDataset.joinsubdatasets(dataset_list)
+    new_set = SuperCellFmtEnDataset.joinsubsets(dataset_list)
     torch.save(new_set,savepath)
 
 if __name__=="__main__":
     # prefix = "gdrive/MyDrive/Raman_machine_learning/OQMD/"
     # check_dataset(Path(prefix+"Valid_set.json"),prefix+"Valid_set_checked.json")
     # convert_fmten_set_to_spsp_set("materials/mp/Valid_fmten_set.pt","materials/mp/Valid_spgp_set.pt")
-    # prepare_datesets("materials/JVASP/Train_unique_mp_id.json","materials/JVASP/Train_raman_set_strain_neg0.1.pt")
-    joinstains(["materials/JVASP/Train_raman_set_strain_neg0.1.pt","materials/JVASP/Train_raman_set_strain_neg0.05.pt","materials/JVASP/Train_raman_set_strain_0.pt"],"materials/JVASP/Train_raman_set_strain_neg0.1_to_0.pt")
+    # prepare_datesets("materials/OQMD/Train_set_checked.json","materials/OQMD/Train_fmten_set_supercell_121")
+    joinstains(["materials/OQMD/Train_fmten_set_supercell_211.pt","materials/OQMD/Train_fmten_set_supercell_121.pt","materials/OQMD/Train_fmten_set_supercell_112.pt"],"materials/OQMD/Train_fmten_set_supercell_single_2.pt")

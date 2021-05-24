@@ -4,17 +4,17 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from torch.utils.data import DataLoader
 import torch
 import torch.nn.functional as F
-from dataset import StructureFmtEnDataset
+from dataset import SuperCellFmtEnDataset
 from cos_anneal.cosine_annearing_with_warmup import CosineAnnealingWarmupRestarts
 
 
 def ff(input_dim):
-    return torch.nn.Sequential(torch.nn.Linear(input_dim, 256))
+    return torch.nn.Sequential(torch.nn.Linear(input_dim, 128))
 
 
-def ff_output(input_dim, output_dim):
+def ff_output(input_dim, hidden_dim ,output_dim):
     # , RReLU(), Dropout(0.1), torch.nn.Linear(128, 64), RReLU(), Dropout(0.1), torch.nn.Linear(64, output_dim))
-    return torch.nn.Sequential(torch.nn.Linear(input_dim, output_dim))
+    return torch.nn.Sequential(torch.nn.Linear(input_dim, hidden_dim), torch.nn.RReLU(),torch.nn.Linear(hidden_dim,output_dim))
 
 
 class Experiment(pl.LightningModule):
@@ -24,18 +24,18 @@ class Experiment(pl.LightningModule):
         self.lr = lr
         self.atom_embedding = ff(459)
         self.atomic_number_embedding = torch.nn.Embedding(
-            num_embeddings=95, embedding_dim=256, padding_idx=0)
+            num_embeddings=95, embedding_dim=128, padding_idx=0)
         self.mendeleev_number_embedding = torch.nn.Embedding(
-            num_embeddings=104, embedding_dim=256, padding_idx=0)
+            num_embeddings=104, embedding_dim=128, padding_idx=0)
         self.space_group_number_embedding = torch.nn.Embedding(
-            num_embeddings=230, embedding_dim=256)
+            num_embeddings=230, embedding_dim=128)
         self.position_embedding = ff(240)
         self.lattice_embedding = ff(800)
         encode_layer = torch.nn.TransformerEncoderLayer(
-            d_model=256, nhead=8, dim_feedforward=1024)
+            d_model=128, nhead=8, dim_feedforward=512)
         self.encoder = torch.nn.TransformerEncoder(
             encode_layer, num_layers=12)
-        self.readout = ff_output(input_dim=256, output_dim=1)
+        self.readout = ff_output(input_dim=128, hidden_dim=64,output_dim=1)
 
     @staticmethod
     def Gassian_expand(value_list, min_value, max_value, intervals, expand_width):
@@ -190,7 +190,7 @@ def model_config(optim_type, optim_lr, optim_weight_decay):
 
 
 if __name__ == "__main__":
-    prefix = "/home/jlx/v0.4.7/13.pretrain_fmten_oqmd_dim_48/"
+    prefix = "/home/jlx/v0.4.8/4.pretrain_fmten_oqmd_supercell_single_2/"
     trainer_config = "fit"
     checkpoint_path = None
     model_hpparams = model_config(
@@ -203,8 +203,8 @@ if __name__ == "__main__":
     acce = None
 
     # train_set = torch.load(f"./materials/OQMD/Train_fmten_set_part_{train_set_part}.pt")
-    train_set = torch.load("./materials/OQMD/Train_fmten_set.pt")
-    validate_set = torch.load("./materials/OQMD/Valid_fmten_set.pt")
+    train_set = torch.load("./materials/OQMD/Train_fmten_set_supercell_single_2.pt")
+    validate_set = torch.load("./materials/OQMD/Valid_fmten_set_supercell_single_2.pt")
     train_dataloader = DataLoader(
         dataset=train_set, batch_size=batch_size, num_workers=4, shuffle=True)
     validate_dataloader = DataLoader(
