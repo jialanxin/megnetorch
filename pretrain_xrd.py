@@ -4,7 +4,7 @@ import pytorch_lightning as pl
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
 from torch.utils.data import DataLoader
-from dataset import StructureXRDDataset
+from dataset import StructureXRDDataset, SuperCellXRDDataset
 from pretrain_fmten import Experiment as FmtEn
 from cos_anneal.cosine_annearing_with_warmup import CosineAnnealingWarmupRestarts
 
@@ -13,9 +13,9 @@ def ff(input_dim):
     return torch.nn.Sequential(torch.nn.Linear(input_dim, 128))
 
 
-def ff_output(input_dim, output_dim):
-    # , torch.nn.RReLU(), Dropout(0.3), torch.nn.Linear(128, 128), torch.nn.RReLU(), Dropout(0.3), torch.nn.Linear(128, output_dim))
-    return torch.nn.Sequential(torch.nn.Linear(input_dim, output_dim))
+def ff_output(input_dim, hidden_dim ,output_dim):
+    # , RReLU(), Dropout(0.1), torch.nn.Linear(128, 64), RReLU(), Dropout(0.1), torch.nn.Linear(64, output_dim))
+    return torch.nn.Sequential(torch.nn.Linear(input_dim, hidden_dim), torch.nn.RReLU(),torch.nn.Linear(hidden_dim,output_dim))
 
 
 class Experiment(pl.LightningModule):
@@ -24,7 +24,7 @@ class Experiment(pl.LightningModule):
         self.save_hyperparameters()
         self.lr = lr
         fmten_model = FmtEn.load_from_checkpoint(
-            "pretrain/fmten/epoch=585-step=659835.ckpt")
+            "pretrain/fmten/epoch=213-step=722891.ckpt")
         self.atom_embedding = fmten_model.atom_embedding
         self.atomic_number_embedding = fmten_model.atomic_number_embedding
         self.space_group_number_embedding = fmten_model.space_group_number_embedding
@@ -32,7 +32,7 @@ class Experiment(pl.LightningModule):
         self.position_embedding = fmten_model.position_embedding
         self.lattice_embedding = fmten_model.lattice_embedding
         self.encoder = fmten_model.encoder
-        self.readout = ff_output(input_dim=256, output_dim=50)
+        self.readout = ff_output(input_dim=128, hidden_dim=64, output_dim=50)
 
     @staticmethod
     def Gassian_expand(value_list, min_value, max_value, intervals, expand_width):
@@ -270,9 +270,9 @@ def model_config(optim_type, optim_lr, optim_weight_decay, model_nonboj, model_c
 
 
 if __name__ == "__main__":
-    prefix = "/home/jlx/v0.4.8/1.pretrain_xrd/"
+    prefix = "/home/jlx/v0.4.8/5.pretrain_xrd_supercell_single_2/"
     trainer_config = "fit"
-    checkpoint_path = "/home/jlx/v0.4.8/1.pretrain_xrd/default/version_1/checkpoints/epoch=19-step=22075.ckpt"
+    checkpoint_path = None
     model_hpparams = model_config(
         optim_type="AdamW", optim_lr=1e-4, optim_weight_decay=0.0, model_nonboj=0.4, model_coord=2.0)
     # train_set_part = 1
@@ -287,15 +287,15 @@ if __name__ == "__main__":
         mode='min',
     )
 
-    train_set = torch.load("materials/OQMD/Train_xrd_set.pt")
+    train_set = torch.load("materials/OQMD/Train_xrd_set_supercell_single_2.pt")
     validate_set = torch.load(
-        "materials/OQMD/Valid_xrd_set.pt")
+        "materials/OQMD/Valid_xrd_set_supercell_single_2.pt")
     train_dataloader = DataLoader(
         dataset=train_set, batch_size=batch_size, num_workers=4, shuffle=True)
     validate_dataloader = DataLoader(
         dataset=validate_set, batch_size=batch_size, num_workers=4)
 
-    experiment = Experiment.load_from_checkpoint(checkpoint_path)
+    experiment = Experiment(**model_hpparams)
 
     logger = TensorBoardLogger(prefix)
     if trainer_config == "tune":

@@ -179,6 +179,16 @@ class StructureXRDDataset(StructureFmtEnDataset):
         xrd_postion, xrd_intensity = graph.get_xrd()
         return encoded_graph,{"PS":xrd_postion,"IT":xrd_intensity}
 
+class SuperCellXRDDataset(StructureXRDDataset):
+    @staticmethod
+    def convert(item):
+        structure = Structure.from_dict(item["structure"])  
+        structure.make_supercell([1,2,1])
+        graph = CrystalEmbedding(structure,max_atoms=60)
+        encoded_graph = graph.convert_to_model_input()
+        xrd_postion, xrd_intensity = graph.get_xrd()
+        return encoded_graph,{"PS":xrd_postion,"IT":xrd_intensity}
+
 class StructureFmtEnStreamDataset(Dataset):
     def __init__(self,json_file_path:Path, post_check=True):
         if isinstance(json_file_path, Path):
@@ -268,7 +278,7 @@ class StructureRamanModesDataset(StructureFmtEnDataset):
 def prepare_datesets(json_file,pt_file):
     with open(json_file, "r") as f:
         data = json.load(f)
-    dataset = SuperCellFmtEnDataset.preprocess(data)
+    dataset = SuperCellXRDDataset.preprocess(data)
     print(len(dataset))
     torch.save(dataset, pt_file)
 
@@ -290,12 +300,12 @@ def joinstains(pathlist,savepath):
     for path in pathlist:
         dataset = torch.load(path)
         dataset_list.append(dataset)
-    new_set = SuperCellFmtEnDataset.joinsubsets(dataset_list)
+    new_set = SuperCellXRDDataset.joinsubsets(dataset_list)
     torch.save(new_set,savepath)
 
 if __name__=="__main__":
     # prefix = "gdrive/MyDrive/Raman_machine_learning/OQMD/"
     # check_dataset(Path(prefix+"Valid_set.json"),prefix+"Valid_set_checked.json")
     # convert_fmten_set_to_spsp_set("materials/mp/Valid_fmten_set.pt","materials/mp/Valid_spgp_set.pt")
-    # prepare_datesets("materials/OQMD/Train_set_checked.json","materials/OQMD/Train_fmten_set_supercell_121")
-    joinstains(["materials/OQMD/Train_fmten_set_supercell_211.pt","materials/OQMD/Train_fmten_set_supercell_121.pt","materials/OQMD/Train_fmten_set_supercell_112.pt"],"materials/OQMD/Train_fmten_set_supercell_single_2.pt")
+    # prepare_datesets("materials/OQMD/Valid_set_checked.json","materials/OQMD/Valid_xrd_set_supercell_121.pt")
+    joinstains(["materials/OQMD/Train_xrd_set_supercell_211.pt","materials/OQMD/Train_xrd_set_supercell_121.pt","materials/OQMD/Train_xrd_set_supercell_112.pt"],"materials/OQMD/Train_xrd_set_supercell_single_2.pt")
