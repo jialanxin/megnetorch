@@ -4,7 +4,7 @@ import pytorch_lightning as pl
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
 from torch.utils.data import DataLoader
-from dataset import StructureRamanDataset, StrainStructureRamanDataset
+from dataset import StructureRamanDataset, StrainStructureRamanDataset, SuperCellRamanDataset
 from pretrain_fmten import Experiment as FmtEn
 from pretrain_xrd import Experiment as XRD
 from cos_anneal.cosine_annearing_with_warmup import CosineAnnealingWarmupRestarts
@@ -14,18 +14,18 @@ def ff(input_dim):
     return torch.nn.Sequential(torch.nn.Linear(input_dim, 128))
 
 
-def ff_output(input_dim, output_dim):
-    # , torch.nn.RReLU(), Dropout(0.3), torch.nn.Linear(128, 128), torch.nn.RReLU(), Dropout(0.3), torch.nn.Linear(128, output_dim))
-    return torch.nn.Sequential(torch.nn.Linear(input_dim, output_dim))
+def ff_output(input_dim, hidden_dim ,output_dim):
+    # , RReLU(), Dropout(0.1), torch.nn.Linear(128, 64), RReLU(), Dropout(0.1), torch.nn.Linear(64, output_dim))
+    return torch.nn.Sequential(torch.nn.Linear(input_dim, hidden_dim), torch.nn.RReLU(),torch.nn.Linear(hidden_dim,output_dim))
 
 
 class Backbone(pl.LightningModule):
     def __init__(self):
         super().__init__()
         fmten_model = FmtEn.load_from_checkpoint(
-            "pretrain/fmten/epoch=585-step=659835.ckpt")
+            "pretrain/fmten/epoch=213-step=722891.ckpt")
         xrd_model = XRD.load_from_checkpoint(
-            "pretrain/xrd/epoch=998-step=1124429.ckpt")
+            "pretrain/xrd/epoch=529-step=1790339.ckpt")
         self.atom_embedding = fmten_model.atom_embedding
         self.atomic_number_embedding = fmten_model.atomic_number_embedding
         self.space_group_number_embedding = xrd_model.space_group_number_embedding
@@ -147,7 +147,7 @@ class Experiment(pl.LightningModule):
         # self.encoder = torch.nn.TransformerEncoder(
         # encode_layer, num_layers=layer)
         # self.re_init_parameters(self.encoder.layers[5])
-        self.readout = ff_output(input_dim=256, output_dim=100)
+        self.readout = ff_output(input_dim=128, hidden_dim=128, output_dim=100)
 
     @staticmethod
     def re_init_parameters(layer):
@@ -341,7 +341,7 @@ def model_config(optim_type, optim_lr, optim_weight_decay, model_coord, model_la
 
 
 if __name__ == "__main__":
-    prefix = "/home/jlx/v0.4.8/3.finetune_augmentation_strain_neg0.1_to_0/"
+    prefix = "/home/jlx/v0.4.8/6.finetune_supercell_single_2/"
     trainer_config = "fit"
     checkpoint_path = None
     model_hpparams = model_config(
@@ -358,9 +358,9 @@ if __name__ == "__main__":
     )
 
     train_set = torch.load(
-        "materials/JVASP/Train_raman_set_strain_neg0.1_to_0.pt")
+        "materials/JVASP/Train_raman_set_supercell_single_2.pt")
     validate_set = torch.load(
-        "materials/JVASP/Valid_raman_set_25_uneq_yolov1.pt")
+        "materials/JVASP/Valid_raman_set_supercell_single_2.pt")
     train_dataloader = DataLoader(
         dataset=train_set, batch_size=batch_size, num_workers=4, shuffle=True)
     validate_dataloader = DataLoader(
